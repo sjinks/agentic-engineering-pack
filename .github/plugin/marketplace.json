@@ -1,0 +1,13 @@
+{
+    "name": "agentic-engineering",
+    "metadata": {
+        "description": "A plugin for agentic engineering orchestration."
+    },
+    "plugins": [
+        {
+            "name": "agentic-engineering",
+            "description": "A plugin for agentic engineering orchestration.",
+            "source": "./agentic-engineering"
+        }
+    ]
+}

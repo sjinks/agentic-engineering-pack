@@ -4,7 +4,7 @@ This workspace contains a v1 AI orchestration customization pack for VS Code and
 
 ## Guide
 
-For a comprehensive overview of the pack, including component descriptions, workflow diagrams, handoff contracts, gates, and failure modes this design prevents, see [docs/agentic/README.md](docs/agentic/README.md). This guide contains Mermaid diagrams showing orchestration flows, Linear issue workflows, PR review comment workflows, review arbitration, and commit/PR finalization steps.
+For a comprehensive overview of the pack, including component descriptions, workflow diagrams, handoff contracts, gates, and failure modes this design prevents, see [docs/agentic/README.md](docs/agentic/README.md) (generated layout) or [agentic-engineering/docs/README.md](agentic-engineering/docs/README.md) (source layout). This guide contains Mermaid diagrams showing orchestration flows, Linear issue workflows, PR review comment workflows, review arbitration, and commit/PR finalization steps.
 
 ## Generate an Installable Copilot Plugin
 
