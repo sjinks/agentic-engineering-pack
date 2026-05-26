@@ -231,3 +231,22 @@ test('synthesis PR body line is emitted only after completed adversarial review'
     assert.match(prDescription, /must be removed if it appears in a non-synthesis PR or in a trivial synthesis skip/);
     assert.match(prDescription, /Pre-push adversarial review status report .* is operator-facing only and MUST never appear inside the fenced PR body/s);
 });
+
+test('pull request description guards against hard-wrapped PR bodies', async () => {
+    const text = await read(pullRequestDescriptionPath);
+
+    assert.match(
+        text,
+        /7\. Generate copy\/pasteable Markdown\.\s+8\. Before returning or emitting the fenced Markdown body, inspect the candidate PR body/s,
+    );
+    assert.match(text, /hard-wrapped paragraphs or list items/i);
+    assert.match(text, /Repair hard-wrapped paragraphs\/list items before emitting\./);
+    assert.match(
+        text,
+        /cannot confidently distinguish intentional Markdown structure .* from accidental hard wrapping, block and fail fast instead of returning a final body/s,
+    );
+    assert.match(
+        text,
+        /~72-character body wrap from `commit-body-guidelines` and `conventional-commits` applies to commit bodies only; .* do not carry their wrap width into the PR body/s,
+    );
+});
