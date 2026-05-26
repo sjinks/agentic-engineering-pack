@@ -3,6 +3,10 @@
     "metadata": {
         "description": "A plugin for agentic engineering orchestration."
     },
+    "owner": {
+        "name": "Volodymyr Kolesnykov",
+        "email": "volodymyr@wildwolf.name"
+    },
     "plugins": [
         {
             "name": "agentic-engineering",
