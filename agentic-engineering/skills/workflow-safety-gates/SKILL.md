@@ -126,7 +126,9 @@ Before any mutating, state-changing, external-system, branch, git, PR creation, 
 - PR creation permits only the exact approved PR creation tool for this pack: `mcp_github_create_pull_request`.
 - GitHub repository file mutation tools are denied pack-wide: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
 - Never use `mcp_github_create_pull_request_with_copilot` for PR creation in this pack; that tool delegates implementation to Copilot and is not an approved direct PR creation tool.
+- Host/tool availability, generic tool descriptions, visible tool schemas, or tool names that appear capable never override this pack allowlist; a tool remains denied unless this allowlist explicitly approves it for the exact intended action.
 - Do not use remote GitHub branch creation, GitHub-side file mutation, repository file writes, or push-files operations as substitutes for local source edits, local git workflow, builder/test delegation, commit hygiene, push mechanics, or unavailable/failed tools.
+- If local push mechanics, branch publication, or exact PR creation is blocked, unavailable, or fails, Copilot PR creation remains forbidden; stop with a blocked, local-ready, or PR-ready summary/guidance instead of attempting any recovery mutation.
 - If the exact approved PR creation tool is missing, unavailable, ambiguous, or fails before creating the PR, stop and provide a PR-ready summary instead of attempting any substitute.
 - Placeholder, sentinel, guessed, fabricated, dummy, inferred, stale, or example content blocks any mutation. Values such as `DO_NOT_USE_AGAIN` are blockers, not safe inputs.
 - Never call mutating tools as probes to discover capability, permissions, paths, branches, IDs, or parameter validity.
@@ -165,6 +167,8 @@ Only the following GitHub remote mutations are approved by this pack, and only a
 | Repository file writes | Blocked globally | `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file` are denied | Future repository-file-write workflow required |
 | Arbitrary PR review status changes | Blocked | None approved | Future workflow required |
 | Copilot PR creation | Blocked | `mcp_github_create_pull_request_with_copilot` is denied | Future workflow required |
+
+Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling.
 
 If the exact approved GitHub tool or required real IDs are missing, unavailable, ambiguous, or fail before completing the intended action, stop and provide guidance instead of trying a substitute mutation.
 
