@@ -88,8 +88,25 @@ test('PR review workflow orders push visibility, fresh thread snapshot, gatekeep
     assert.ok(freshThreadSnapshot > pushVisibility, 'fresh thread snapshot follows push visibility');
     assert.ok(gatekeeper > freshThreadSnapshot, 'gatekeeper follows fresh thread snapshot');
     assert.ok(replyAndResolve > gatekeeper, 'reply/resolve text follows gatekeeper pass');
+    assert.match(workflow, /apply the `workflow-safety-gates` Remote Read-Only Tool Intent Gate, then re-fetch unresolved\/reopened thread state/);
+    assert.match(workflow, /Comment-writing, reply, status-changing, review-write, approval, request-changes, dismiss, resolve, unresolve, delete, submit, create, update, merge, push, write, and other mutation-primary tools or methods are forbidden as sanity checks/);
+    assert.match(workflow, /Read-only review comment\/thread\/status metadata reads are allowed when their primary purpose is freshness or metadata readback/);
     assert.match(workflow, /do not declare the round complete, recommend merge, post reviewer-facing replies, or resolve threads while it reports `fail` or `BLOCK`/);
     assert.match(workflow, /If the required real reply or resolve ID is unavailable, block only that affected reply or resolve sub-action/);
+});
+
+test('PR review workflow blocks generic GraphQL ID fallback', async () => {
+    const text = await read(prReviewSkillPath);
+    const actionGate = text.slice(
+        text.indexOf('## PR Thread Action Gate'),
+        text.indexOf('## Workflow'),
+    );
+
+    assert.doesNotMatch(actionGate, /gh api graphql/i);
+    assert.doesNotMatch(actionGate, /Fallback to obtain actual IDs/);
+    assert.match(actionGate, /Approved read-primary ID source: `mcp_github_pull_request_read` with method `get_review_comments`/);
+    assert.match(actionGate, /If approved read-primary GitHub data does not expose the actual thread node ID or per-comment `databaseId`, block only the affected reply or resolve sub-action/);
+    assert.match(actionGate, /Do not use a generic GraphQL CLI, generic API CLI, remote execute, or execute-capable path to recover missing IDs/);
 });
 
 test('Linear entrypoints and docs carry no-PR thread-state proof language', async () => {
@@ -142,6 +159,41 @@ test('workflow safety gates deny Copilot PR creation as fallback or substitute',
     assert.match(text, /Host\/tool availability, generic tool descriptions, visible tool schemas, or tool names that appear capable never override this pack allowlist/);
     assert.match(text, /If local push mechanics, branch publication, or exact PR creation is blocked, unavailable, or fails[\s\S]+stop with a blocked, local-ready, or PR-ready summary\/guidance/);
     assert.match(text, /Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling/);
+});
+
+test('workflow safety gates require read-only remote tools for read-only verification', async () => {
+    const text = await read(workflowSafetyGatesPath);
+
+    assert.match(text, /## Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /read-only remote verification, sanity check, metadata read, metadata readback, or parallel batch of remote checks, including pre-mutation and post-mutation reads/);
+    assert.match(text, /select only tools or methods whose primary purpose is read-only metadata or verification/);
+    assert.match(text, /when they describe the tool or method's primary action or operation/);
+    assert.match(text, /Do not deny a read-primary method solely because a mutation-associated word appears inside the object being read or the metadata category being returned/);
+    assert.match(text, /Read-primary tools or methods such as `get_\*`, `list_\*`, `read`, `search`, PR\/status metadata reads, `pull_request_read method=get_review_comments`, `pull_request_read method=get_reviews`, and `pull_request_read method=get_comments` are allowed when their declared purpose is read-only/);
+    assert.match(text, /Mutation-primary operations remain forbidden for read-only verification/);
+    assert.match(text, /Mutation-implying primary actions include comment-writing, reply, add-comment, status-changing, `approve`, `request_changes`, `dismiss`, `close`, `reopen`, `assign`, `label`, `resolve`, `unresolve`, `submit`, `delete`, `create`, `update`, `merge`, `push`, `write`/);
+    assert.match(text, /Remote mutation-capable tools or methods must not be batched in parallel/);
+    assert.match(text, /Parallel remote read batches are allowed only when every tool and method in the batch is read-only by primary purpose/);
+    assert.match(text, /stop all remote operations immediately/);
+    assert.match(text, /Do not repeat the same remote call as recovery/);
+    assert.match(text, /the next remote action passes the appropriate fresh gate: Remote Read-Only Tool Intent Gate for read-only continuation, or Mutation Intent Gate plus the applicable remote mutation allowlist for mutation continuation/);
+    assert.match(text, /Before any remote operation resumes, record a wrong-tool incident report that includes the intended action, actual tool or method, observed result, whether anything changed, and the guard or remediation added/);
+});
+
+test('orchestrator applies read-only remote intent gate to readbacks and parallel checks', async () => {
+    const text = await read(orchestratorPath);
+
+    assert.match(text, /Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /Before any GitHub or Linear read-only remote verification, sanity check, metadata read, metadata readback, or remote-check batch, including pre-mutation and post-mutation reads, apply the Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /Read-only remote verification must use tools or methods that are read-only by primary purpose/);
+    assert.match(text, /`get_\*`, `list_\*`, `read`, `search`, PR\/status metadata reads, and `pull_request_read` methods such as `get_review_comments`, `get_reviews`, and `get_comments` remain allowed when the operation is read-only/);
+    assert.match(text, /Parallel remote checks may batch only tools and methods that are read-only by primary purpose/);
+    assert.match(text, /Before GitHub or Linear read-only remote verification, sanity checks, metadata reads, metadata readbacks, or remote-check batches, including pre-mutation and post-mutation reads, apply the Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /For PR creation preparation reads and post-creation sanity readbacks, apply the `workflow-safety-gates` Remote Read-Only Tool Intent Gate before any PR metadata read/);
+    assert.match(text, /`pull_request_read`-style reads/);
+    assert.match(text, /PR\/status metadata reads remain allowed when their operation is read-only/);
+    assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools as sanity checks/);
+    assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools for the readback/);
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
