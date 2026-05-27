@@ -708,7 +708,7 @@ Prevents: Fixing wrong issues, wasting effort on ambiguous or misscoped work, si
 
 **GitHub PR Creation -> Template Checked and Honored**
 
-The detailed checklist lives in [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR, the workflow checks standard template locations, uses a single clear template, asks the user when multiple templates are ambiguous, or falls back explicitly when no template is found/readable.
+The detailed checklist lives in [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR or publishing a PR-ready body, the workflow checks standard template locations, uses a single readable template even if other candidates are unreadable, asks the user when multiple readable templates are ambiguous, treats `selected-template-unreadable-choice-required` as ask-or-block when a chosen template is unreadable but readable alternatives exist, or falls back explicitly when no template is found or no readable candidates exist.
 
 The workflow composes the PR body explicitly from the selected template or fallback. It does not assume GitHub MCP/API PR creation tools will auto-apply repository templates, and it includes PR template status in final reporting whenever PR creation happens.
 
@@ -849,9 +849,10 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 5. After implementation, verification, review, test-gap planning when needed, and commit hygiene pass, pushes to the branch via delegated local git mechanics and confirms the pushed commits are visible on the remote.
 6. Runs `review-cycle-gatekeeper` after remote visibility confirmation and before PR creation, passing `thread state: not applicable - no PR exists yet` with proof when no PR exists yet.
 7. Checks durable-record requirements such as shared-module prompt output and verified-internals evidence when they apply.
-8. Applies the PR Body Audit Gate to the complete selected-template/fallback candidate body and proceeds only with `pass` or `repaired` status.
-9. Creates GitHub PR with `mcp_github_create_pull_request`, the Linear issue link, the audited selected-template/fallback body, and any required reviewer-facing durable records.
-10. Linear issue remains open (no automatic status updates) unless user explicitly approves.
+8. Checks the target repository for PR templates, uses a single readable template even if other candidates are unreadable, asks when multiple readable templates are unresolved and ambiguous, treats `selected-template-unreadable-choice-required` as ask/block when a chosen template is unreadable but readable alternatives exist, and then selects the template or fallback body.
+9. Applies the PR Body Audit Gate to the complete selected-template/fallback candidate body and proceeds only with `pass` or `repaired` status.
+10. Creates GitHub PR with `mcp_github_create_pull_request`, the Linear issue link, the audited selected-template/fallback body, and any required reviewer-facing durable records.
+11. Linear issue remains open (no automatic status updates) unless user explicitly approves.
 
 ### Addressing PR Review Comments
 

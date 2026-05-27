@@ -345,8 +345,10 @@ Linear-provided branch names are remote context, not automatically safe local co
 Before GitHub PR creation or PR-ready body publication:
 
 - Check standard template locations: `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `PULL_REQUEST_TEMPLATE.md`, `docs/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, and root/docs `PULL_REQUEST_TEMPLATE/*.md` directories when multiple templates are supported.
-- If exactly one readable template is found, compose the PR body using that template structure.
-- If multiple templates are found and repository convention does not clearly select one, ask the user before PR creation.
+- Record every discovered candidate's readability status. Ambiguity is based on readable templates, not total candidate count; unreadable candidates are operator-facing evidence/status only unless the selected or repository-convention template itself is unreadable.
+- If exactly one readable template is found, compose the PR body using that template structure, even if other discovered candidates are unreadable. Report unreadable candidates to the operator only.
+- If multiple readable templates are found and repository convention clearly selects a readable one, compose the PR body using that template structure and report the convention evidence to the operator only.
+- If multiple readable templates are found and repository convention does not clearly select one, ask the user before PR creation or PR-ready body publication. If the workflow cannot ask, block.
 - If a user-selected or repository-convention-selected template is unreadable and at least one other candidate template is readable, status is `selected-template-unreadable-choice-required`: ask the user to choose a readable template or confirm fallback use before PR creation or PR-ready body publication. If the workflow cannot ask, block. Do not silently use the fallback body and do not silently switch to a readable alternative.
 - If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable, use the workflow fallback body and state that template status explicitly to the operator (see PR Body Audience below); do not state it inside the PR body itself.
 - Do not assume GitHub MCP/API PR creation tools will auto-apply repository templates.

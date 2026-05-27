@@ -654,7 +654,10 @@ test('PR description template policy owns template discovery and operator-facing
     assert.match(text, /\.github\/pull_request_template\.md/);
     assert.match(text, /\.github\/PULL_REQUEST_TEMPLATE\/\*\.md/);
     assert.match(text, /If exactly one readable template is found/);
-    assert.match(text, /If multiple templates are found and no repository convention clearly selects one/);
+    assert.match(text, /Ambiguity is based on readable templates, not total candidate count/);
+    assert.match(text, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
+    assert.match(text, /If multiple readable templates are found and no repository convention clearly selects one/);
+    assert.match(text, /list each readable candidate template path, include unreadable candidates as status evidence/);
     assert.match(text, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
     assert.match(text, /Template status is for the operator-facing notes outside the fenced PR body only/);
     assert.match(text, /no-template-fallback-used/);
@@ -665,21 +668,47 @@ test('PR description template policy owns template discovery and operator-facing
 test('selected unreadable template blocks when readable alternatives exist', async () => {
     const templatePolicy = await read(prDescriptionTemplatePolicyPath);
     const workflowSafety = await read(workflowSafetyGatesPath);
+    const rootReadme = await read(rootReadmePath);
+    const guideReadme = await read(docsPath);
     const templateGate = workflowSafety.slice(
         workflowSafety.indexOf('## PR Template Gate'),
         workflowSafety.indexOf('### PR Body Audience'),
     );
+    const rootLinear = rootReadme.slice(
+        rootReadme.indexOf('## Linear Issue Workflow'),
+        rootReadme.indexOf('### Invalid Triage Gate'),
+    );
+    const guideTemplateGate = guideReadme.slice(
+        guideReadme.indexOf('### Pull Request Template Gate'),
+        guideReadme.indexOf('### External Project Scope Gate'),
+    );
 
     assert.match(templatePolicy, /selected-template-unreadable-choice-required/);
+    assert.match(templatePolicy, /Ambiguity is based on readable templates, not total candidate count/);
+    assert.match(templatePolicy, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
+    assert.match(templatePolicy, /If multiple readable templates are found and no repository convention clearly selects one/);
+    assert.match(templatePolicy, /best-guess readable template/);
     assert.match(templatePolicy, /user-selected or repository-convention-selected template is unreadable and at least one other candidate template is readable/);
     assert.match(templatePolicy, /Do not silently use the fallback template and do not silently switch to a readable alternative/);
     assert.match(templatePolicy, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
 
     assert.match(templateGate, /selected-template-unreadable-choice-required/);
+    assert.match(templateGate, /Ambiguity is based on readable templates, not total candidate count/);
+    assert.match(templateGate, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
+    assert.match(templateGate, /If multiple readable templates are found and repository convention does not clearly select one, ask the user before PR creation or PR-ready body publication/);
     assert.match(templateGate, /ask the user to choose a readable template or confirm fallback use/);
     assert.match(templateGate, /If the workflow cannot ask, block/);
     assert.match(templateGate, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
     assert.doesNotMatch(templateGate, /selected template cannot be read, use the workflow fallback body/i);
+
+    assert.match(rootLinear, /uses a single readable template as the PR body structure even if other candidates are unreadable/);
+    assert.match(rootLinear, /multiple readable templates require a user choice/);
+    assert.match(rootLinear, /selected-template-unreadable-choice-required/);
+    assert.match(rootLinear, /ask-or-block when a chosen template is unreadable but readable alternatives exist/);
+    assert.match(guideTemplateGate, /uses a single readable template even if other candidates are unreadable/);
+    assert.match(guideTemplateGate, /multiple readable templates are ambiguous/);
+    assert.match(guideTemplateGate, /selected-template-unreadable-choice-required/);
+    assert.match(guideTemplateGate, /ask-or-block when a chosen template is unreadable but readable alternatives exist/);
 });
 
 test('workflow safety PR Body Audit Gate is canonical for all PR body paths', async () => {
@@ -754,6 +783,27 @@ test('operator-facing docs require PR Body Audit Gate before PR creation', async
     }
 
     assert.match(rootLinear, /operator-facing PR template status/);
+});
+
+test('Linear Issue to PR docs summary checks template choice before PR Body Audit Gate', async () => {
+    const guideReadme = await read(docsPath);
+    const section = guideReadme.slice(
+        guideReadme.indexOf('### Linear Issue to PR'),
+        guideReadme.indexOf('### Addressing PR Review Comments'),
+    );
+
+    const templateCheck = section.indexOf('8. Checks the target repository for PR templates');
+    const auditGate = section.indexOf('9. Applies the PR Body Audit Gate');
+    const prCreation = section.indexOf('10. Creates GitHub PR with `mcp_github_create_pull_request`');
+
+    assert.ok(templateCheck >= 0, 'Linear Issue to PR summary checks PR templates');
+    assert.ok(auditGate > templateCheck, 'PR Body Audit Gate follows template choice in the summary');
+    assert.ok(prCreation > auditGate, 'PR creation follows PR Body Audit Gate in the summary');
+    assert.match(section, /uses a single readable template even if other candidates are unreadable/);
+    assert.match(section, /asks when multiple readable templates are unresolved and ambiguous/);
+    assert.match(section, /selected-template-unreadable-choice-required/);
+    assert.match(section, /ask\/block when a chosen template is unreadable but readable alternatives exist/);
+    assert.match(section, /complete selected-template\/fallback candidate body/);
 });
 
 test('Verified non-changes citation rules are inherited by direct PR body paths', async () => {
