@@ -132,6 +132,18 @@ test('canonical first-round non-trivial adversarial-review definitions are risk-
     assert.match(text, /Shared-module decline cannot override this separate mandatory non-trivial trigger/);
 });
 
+test('workflow safety gates deny Copilot PR creation as fallback or substitute', async () => {
+    const text = await read(workflowSafetyGatesPath);
+
+    assert.match(text, /PR creation permits only the exact approved PR creation tool for this pack: `mcp_github_create_pull_request`/);
+    assert.match(text, /Create pull request \| Approved \| `mcp_github_create_pull_request` only/);
+    assert.match(text, /Never use `mcp_github_create_pull_request_with_copilot` for PR creation in this pack/);
+    assert.match(text, /Copilot PR creation \| Blocked \| `mcp_github_create_pull_request_with_copilot` is denied/);
+    assert.match(text, /Host\/tool availability, generic tool descriptions, visible tool schemas, or tool names that appear capable never override this pack allowlist/);
+    assert.match(text, /If local push mechanics, branch publication, or exact PR creation is blocked, unavailable, or fails[\s\S]+stop with a blocked, local-ready, or PR-ready summary\/guidance/);
+    assert.match(text, /Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling/);
+});
+
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
     const paths = await existingPaths([orchestratorPath, runAgenticPromptPath]);
     assert.ok(paths.length > 0, 'at least one orchestrator/prompt path exists');
