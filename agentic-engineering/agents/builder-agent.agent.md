@@ -58,7 +58,8 @@ If the task appears to meet spec-first or architecture-first trigger conditions 
 3. Keep abstractions local unless the codebase already has a matching shared pattern.
 4. Run focused non-mutating lint, build, or unit checks when available and appropriate; run mutating formatters only when the `## Execute Policy` permits them.
 5. When fixing a reviewer-derived finding, audit the equivalence class required by the orchestrator handoff: sibling parameters, mirror call sites within the function family, opposite-bound checks, structurally identical code in the same module, and type-narrowness mirrors on adjacent arguments. If the finding or scope context is insufficient to complete the audit, report a blocker instead of guessing.
-6. Report any verification that could not be performed.
+6. When verification is in scope for a PR-review fix, classify builder-run checks as targeted verification or broad safe validation. If broad safe validation belongs to `test-agent` or cannot be selected under the current command boundaries, report the candidate command(s) inspected and selected command or unavailable-command conclusion explicitly instead of treating targeted checks as broad validation. When reporting broad safe validation, state whether the evidence is fresh for the final candidate worktree/fix batch; any later builder/test follow-up, review-driven edit, formatting, generated-output handling, or other worktree edit makes prior broad validation stale until rerun or explicitly re-established for the final changed surface.
+7. Report any verification that could not be performed.
 
 ## Updates for PR and Linear Workflows
 - Acknowledge workflows like `pr-review-comments-workflow` and `linear-issue-workflow` can request branch/commit/push as part of their workflow, while PR creation remains orchestrator-only via `mcp_github_create_pull_request` after readiness evidence is present.
@@ -72,5 +73,6 @@ Return:
 - Contract deviations or blockers: identify infeasible FRs, needed scope amendments, design deviations, missing spec/design context, or any reason implementation could not follow the handoff contract.
 - Reviewer-derived fix audit: when applicable, report exact numeric counts as `audited: N, deferred: M`; list tracked follow-up locations for every deferred item. Use non-negative integers only, never ranges or approximations. If no reviewer-derived finding is in scope, state that the audit is not applicable.
 - Test ownership and verification coverage: state whether behavior is covered by existing checks, `test-agent needed`, tests were intentionally not changed with rationale, or there was no production behavior change. Include AC or finding references when relevant and available.
+- Targeted vs broad safe validation when PR-review fixes are in scope: targeted verification status and evidence; broad safe validation status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`); repository-local discovery evidence; candidate command(s) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree/fix batch; proceed/block effect; residual risk; next operator action.
 - Commands run and results.
 - Assumptions or follow-up work.

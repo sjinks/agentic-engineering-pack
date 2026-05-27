@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { access, readFile } from 'node:fs/promises';
+import { access, lstat, readdir, readFile, readlink, realpath } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
 
 const linearSkillPath = '.github/skills/linear-issue-workflow/SKILL.md';
@@ -15,6 +16,9 @@ const pullRequestDescriptionPath = '.github/skills/pull-request-description/SKIL
 const adversarialReviewPath = '.github/skills/adversarial-review/SKILL.md';
 const adversaryAgentPath = '.github/agents/adversary-agent.agent.md';
 const independentReviewerPath = '.github/agents/independent-code-reviewer-agent.agent.md';
+const reviewCycleGatekeeperPath = '.github/skills/review-cycle-gatekeeper/SKILL.md';
+const testAgentPath = '.github/agents/test-agent.agent.md';
+const builderAgentPath = '.github/agents/builder-agent.agent.md';
 
 async function read(path) {
     return readFile(path, 'utf8');
@@ -39,6 +43,88 @@ async function existingPaths(paths) {
     }
     return resolved;
 }
+
+function pathWithin(root, relativePath) {
+    return relativePath ? join(root, ...relativePath.split('/')) : root;
+}
+
+async function collectTree(root, relativePath = '') {
+    const entries = [];
+    const dirents = await readdir(pathWithin(root, relativePath), { withFileTypes: true });
+
+    dirents.sort((left, right) => left.name.localeCompare(right.name));
+
+    for (const dirent of dirents) {
+        const childPath = relativePath ? `${relativePath}/${dirent.name}` : dirent.name;
+
+        if (dirent.isDirectory()) {
+            entries.push([childPath, 'directory']);
+            entries.push(...await collectTree(root, childPath));
+        }
+        else if (dirent.isFile()) {
+            entries.push([childPath, 'file']);
+        }
+        else if (dirent.isSymbolicLink()) {
+            entries.push([childPath, 'symlink']);
+        }
+        else {
+            entries.push([childPath, 'other']);
+        }
+    }
+
+    return entries;
+}
+
+async function assertTreeByteIdentical(packRoot, sourceRoot) {
+    const [packEntries, sourceEntries] = await Promise.all([
+        collectTree(packRoot),
+        collectTree(sourceRoot),
+    ]);
+
+    assert.deepEqual(packEntries, sourceEntries, `${packRoot} tree matches ${sourceRoot}`);
+
+    for (const [relativePath, type] of packEntries) {
+        if (type === 'file') {
+            const [packBytes, sourceBytes] = await Promise.all([
+                readFile(pathWithin(packRoot, relativePath)),
+                readFile(pathWithin(sourceRoot, relativePath)),
+            ]);
+
+            assert.deepEqual(packBytes, sourceBytes, `${packRoot}/${relativePath} matches ${sourceRoot}/${relativePath}`);
+        }
+        else if (type === 'symlink') {
+            const [packLink, sourceLink] = await Promise.all([
+                readlink(pathWithin(packRoot, relativePath)),
+                readlink(pathWithin(sourceRoot, relativePath)),
+            ]);
+
+            assert.equal(packLink, sourceLink, `${packRoot}/${relativePath} symlink target matches ${sourceRoot}/${relativePath}`);
+        }
+    }
+}
+
+test('.github agent and skill pack surfaces resolve to source or remain byte-identical', async () => {
+    for (const [packRoot, sourceRoot] of [
+        ['.github/agents', 'agentic-engineering/agents'],
+        ['.github/skills', 'agentic-engineering/skills'],
+    ]) {
+        const [packStat, sourceStat, packRealPath, sourceRealPath] = await Promise.all([
+            lstat(packRoot),
+            lstat(sourceRoot),
+            realpath(packRoot),
+            realpath(sourceRoot),
+        ]);
+
+        assert.ok(packStat.isDirectory() || packStat.isSymbolicLink(), `${packRoot} is a directory or symlink`);
+        assert.ok(sourceStat.isDirectory(), `${sourceRoot} is a source directory`);
+
+        if (packRealPath === sourceRealPath) {
+            continue;
+        }
+
+        await assertTreeByteIdentical(packRoot, sourceRoot);
+    }
+});
 
 test('Linear skill orders commit hygiene, push visibility, gatekeeper, then PR creation', async () => {
     const text = await read(linearSkillPath);
@@ -92,6 +178,280 @@ test('PR review workflow orders push visibility, fresh thread snapshot, gatekeep
     assert.match(workflow, /If the required real reply or resolve ID is unavailable, block only that affected reply or resolve sub-action/);
 });
 
+test('PR review workflow inserts Broad Safe Validation Gate between targeted checks and readiness', async () => {
+    const text = await read(prReviewSkillPath);
+    const workflow = text.slice(
+        text.indexOf('## Workflow'),
+        text.indexOf('## Review Comment Validation Gate'),
+    );
+
+    const targetedVerification = workflow.indexOf('5. Verify fixes locally with targeted evidence for each addressed comment.');
+    const broadGate = workflow.indexOf('5a. **Broad Safe Validation Gate.**');
+    const commitPush = workflow.indexOf('9. **Commit and push to the PR branch and confirm PR visibility.**');
+    const gatekeeper = workflow.indexOf('11. **Round closure via `review-cycle-gatekeeper`.**');
+    const replyAndResolve = workflow.indexOf('12. Only after the gatekeeper returns `pass`');
+
+    assert.ok(targetedVerification >= 0, 'targeted verification step is present');
+    assert.ok(broadGate > targetedVerification, 'broad gate follows targeted verification');
+    assert.ok(commitPush > broadGate, 'commit/push readiness follows broad gate');
+    assert.ok(gatekeeper > broadGate, 'gatekeeper receives broad gate evidence after the gate');
+    assert.ok(replyAndResolve > broadGate, 'reviewer-facing replies and resolution follow broad gate');
+    assert.match(workflow, /Targeted checks alone do not satisfy this gate when broad safe validation is available/);
+    assert.match(workflow, /invoke `review-cycle-gatekeeper` with[\s\S]+targeted verification evidence per fix, Broad Safe Validation Gate evidence/);
+});
+
+test('PR review Broad Safe Validation Gate is repository-agnostic and separates output-writing validation', async () => {
+    const text = await read(prReviewSkillPath);
+    const section = text.slice(
+        text.indexOf('## Broad Safe Validation Gate'),
+        text.indexOf('## Hard Gate'),
+    );
+
+    assert.match(section, /Broad safe validation is the broadest bounded, non-mutating, locally supported validation relevant to the changed surface/);
+    assert.match(section, /Discover candidate validation commands from repository-local evidence only/);
+    assert.match(section, /Do not use ecosystem, framework, language, or package-manager preference order as normative behavior/);
+    assert.match(section, /Classify each candidate by observed or documented behavior, not by command name or ecosystem/);
+    assert.match(section, /Select the broadest bounded candidate that is relevant to the changed surface and still safe under the current workflow boundaries/);
+    assert.match(section, /Mutating, package-management, dependency-changing, network-contacting, service-starting, environment-changing, and output-writing commands are not ordinary broad safe validation/);
+    assert.match(section, /Output-writing validation is reported separately from ordinary broad safe validation/);
+});
+
+test('PR review Broad Safe Validation Gate requires fresh final-worktree evidence before readiness', async () => {
+    const text = await read(prReviewSkillPath);
+    const workflow = text.slice(
+        text.indexOf('## Workflow'),
+        text.indexOf('## Review Comment Validation Gate'),
+    );
+    const section = text.slice(
+        text.indexOf('## Broad Safe Validation Gate'),
+        text.indexOf('## Hard Gate'),
+    );
+    const hardGate = text.slice(
+        text.indexOf('## Hard Gate'),
+        text.indexOf('## PR Title Rule'),
+    );
+
+    assert.match(workflow, /require broad safe validation before commit\/push readiness, reviewer-facing replies, or review-thread resolution/);
+    assert.match(workflow, /Broad safe validation evidence must be fresh for the final candidate worktree\/fix batch/);
+    assert.match(workflow, /If contextual\/independent review, builder\/test follow-up, formatting, generated-output handling, or any other fix step changes the worktree after broad validation evidence was produced, that evidence is stale until broad validation is rerun or explicitly re-established for the final changed surface/);
+    assert.match(workflow, /Broad Safe Validation Gate evidence including freshness state for the final candidate worktree\/fix batch/);
+    assert.match(section, /Its evidence is valid only when fresh for the final candidate worktree\/fix batch/);
+    assert.match(section, /Freshness is part of the evidence, not an optional note/);
+    assert.match(section, /Later edits invalidate prior broad validation until it is rerun or explicitly re-established for the final changed surface/);
+    assert.match(section, /`passed`: the selected broad safe validation completed successfully, dirty-state boundaries remained acceptable, and the evidence is fresh for the final candidate worktree\/fix batch/);
+    assert.match(hardGate, /If the Broad Safe Validation Gate is missing, failed, blocked, stale, or not fresh for the final candidate worktree\/fix batch, do not push, do not post reviewer-facing replies, and do not resolve threads/);
+    assert.match(text, /Broad Safe Validation Gate: targeted verification status; broad safe validation status[\s\S]+freshness evidence for the final candidate worktree\/fix batch[\s\S]+proceed\/block effect; residual risk; next operator action/);
+});
+
+test('PR review Broad Safe Validation Gate blocks failed or blocked broad validation and requires residual-risk reporting', async () => {
+    const text = await read(prReviewSkillPath);
+    const section = text.slice(
+        text.indexOf('## Broad Safe Validation Gate'),
+        text.indexOf('## Hard Gate'),
+    );
+    const failedStatus = section.match(/- `failed`:[^\n]+/)?.[0] ?? '';
+
+    assert.match(failedStatus, /This blocks push, reviewer-facing replies, and thread resolution until the selected broad safe validation failure is addressed, or until the workflow is re-scoped or reclassified so that command is no longer the selected broad safe validation/);
+    assert.match(failedStatus, /A failed selected broad safe validation cannot be waived through residual risk/);
+    assert.doesNotMatch(failedStatus, /may proceed|proceed only|accepted residual-risk|accepted residual risk|next operator action|reroute/i);
+    assert.match(text, /`blocked`: broad safe validation should run but cannot be selected or executed[\s\S]+blocks push, reviewer-facing replies, and thread resolution/);
+    assert.match(text, /`skipped`: broad safe validation is available but intentionally skipped only with inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(text, /`not applicable`: no meaningful broad validation exists[\s\S]+inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(text, /`mutating-only`: only mutating, network, service-starting, package-management, or output-writing candidates exist\. This is not a pass/);
+    assert.match(text, /It may proceed only with freshness evidence for the final candidate worktree\/fix batch and after either the authorized mutating\/output-writing candidate actually ran and is reported separately with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covers not running it/);
+    assert.match(text, /If the Broad Safe Validation Gate is missing, failed, blocked, stale, or not fresh for the final candidate worktree\/fix batch, do not push, do not post reviewer-facing replies, and do not resolve threads/);
+    assert.match(text, /Broad Safe Validation Gate: targeted verification status; broad safe validation status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\); candidate command\(s\) inspected; selected command or unavailable-command conclusion; repository-local discovery evidence; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action/);
+});
+
+test('PR review status definitions require freshness for non-passing broad validation outcomes', async () => {
+    const text = await read(prReviewSkillPath);
+    const section = text.slice(
+        text.indexOf('## Broad Safe Validation Gate'),
+        text.indexOf('## Hard Gate'),
+    );
+
+    for (const status of ['skipped', 'not applicable', 'mutating-only']) {
+        const line = section.split('\n').find((candidate) => candidate.startsWith('- `' + status + '`:')) ?? '';
+
+        assert.match(line, /freshness evidence for the final candidate worktree\/fix batch/, `${status} requires freshness evidence`);
+    }
+});
+
+test('workflow safety PR readiness requires broad validation evidence for PR-review fix cycles', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const section = text.slice(
+        text.indexOf('## PR Readiness Evidence Gate'),
+        text.indexOf('## PR Review Visibility and Thread Gate'),
+    );
+
+    assert.match(section, /Before GitHub PR creation, require explicit evidence for each mandatory upstream step/);
+    assert.match(section, /Broad Safe Validation Gate evidence is required when PR-review fix cycles are in scope/);
+    assert.match(section, /status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\)/);
+    assert.match(section, /repository-local discovery evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, command classification basis, dirty-state boundary result when executed, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(section, /Missing, failed, blocked, stale, or unknown freshness evidence blocks PR creation readiness/);
+});
+
+test('workflow safety PR readiness accepts skipped broad validation only with evidence and policy basis', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const section = text.slice(
+        text.indexOf('## PR Readiness Evidence Gate'),
+        text.indexOf('## PR Review Visibility and Thread Gate'),
+    );
+
+    assert.match(section, /`skipped` and `not applicable` Broad Safe Validation Gate statuses satisfy readiness only when the output includes the full inspected evidence package and the policy\/risk basis for accepting that status/);
+    assert.match(section, /repository-local discovery, candidate command\(s\), selected or unavailable command conclusion, classification basis, freshness for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(section, /Valid evidence-backed `skipped` and `not applicable` statuses do not block solely because they are skips/);
+});
+
+test('workflow safety PR readiness treats mutating-only broad validation as conditional evidence, not a pass', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const section = text.slice(
+        text.indexOf('## PR Readiness Evidence Gate'),
+        text.indexOf('## PR Review Visibility and Thread Gate'),
+    );
+
+    assert.match(section, /`mutating-only` is not a pass/);
+    assert.match(section, /It satisfies readiness only when the output includes the full inspected evidence package above AND either separately reported authorized mutating\/output-writing command results with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covering not running the mutating\/output-writing candidate/);
+    assert.doesNotMatch(section, /`mutating-only` satisfies readiness solely because authorization exists/i);
+});
+
+test('workflow safety PR readiness skipped-step wording blocks only missing evidence or risk basis', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const section = text.slice(
+        text.indexOf('## PR Readiness Evidence Gate'),
+        text.indexOf('## PR Review Visibility and Thread Gate'),
+    );
+
+    assert.match(section, /If any mandatory step was skipped without the required evidence, policy basis, or residual-risk basis, only logged without a real invocation, unavailable, failed, or blocked, do not create the PR/);
+    assert.match(section, /Valid evidence-backed `skipped` and `not applicable` statuses do not block solely because they are skips/);
+    assert.doesNotMatch(section, /If any mandatory step was skipped, only logged without a real invocation, unavailable, failed, or blocked, do not create the PR/);
+});
+
+test('orchestrator PR creation guidance preserves workflow safety broad-validation status semantics', async () => {
+    const text = await read(orchestratorPath);
+    const guidanceStart = text.indexOf('## PR Creation Guidance');
+    assert.ok(guidanceStart >= 0, 'PR Creation Guidance section is present');
+    const section = text.slice(guidanceStart);
+
+    assert.match(section, /Apply the `workflow-safety-gates` PR Readiness Evidence Gate status semantics/);
+    assert.match(section, /`skipped` and `not applicable` satisfy readiness only with the full inspected evidence package and policy\/risk basis/);
+    assert.match(section, /repository-local discovery evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, command classification basis, freshness for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(section, /`mutating-only` is not a pass; it satisfies readiness only with that full package plus either separately reported authorized mutating\/output-writing command results with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covering not running it/);
+});
+
+test('test agent reports targeted versus broad safe validation with behavior-based command classification', async () => {
+    const text = await read(testAgentPath);
+
+    assert.match(text, /Distinguish targeted verification from broad safe validation in every verification report/);
+    assert.match(text, /Targeted checks alone do not satisfy broad safe validation when a broad safe candidate is available/);
+    assert.match(text, /Discover broad safe validation candidates from repository-local evidence only: checked-in docs, local scripts, task definitions, tool configuration, prior local inspection, and handoff-provided repository evidence/);
+    assert.match(text, /Do not prefer, require, or reject commands because they belong to a particular language, framework, ecosystem, or package manager/);
+    assert.match(text, /Classify candidate commands by behavior and evidence, not by name/);
+    assert.match(text, /`local-only`, `approval-bound`, `forbidden`, unavailable, skipped, not applicable, or mutating-only/);
+    assert.match(text, /output-writing commands are not ordinary broad safe validation[\s\S]+exact command, cwd\/root, expected dirty-state\/output paths, timeout or cleanup plan, and generated-artifact handling/);
+    assert.match(text, /Broad safe validation evidence must be fresh for the final candidate worktree\/fix batch/);
+    assert.match(text, /If contextual\/independent review, builder\/test follow-up, formatting, generated-output handling, or any other fix step changes the worktree after evidence was produced, report prior broad validation as stale until it is rerun or explicitly re-established for the final changed surface/);
+    assert.match(text, /If broad safe validation is `failed`, `blocked`, stale, or has unknown freshness, report that downstream push\/reply\/thread-resolution readiness is blocked; failed selected broad validation cannot be waived through residual risk/);
+    assert.match(text, /If it is `skipped`, `not applicable`, or `mutating-only`, include the inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(text, /For `mutating-only`, proceed only after the authorized mutating\/output-writing command ran and is reported separately with dirty-state\/output boundaries, or after an accepted residual-risk rationale explicitly covers not running it/);
+    assert.match(text, /Targeted vs broad safe validation: targeted verification status and evidence; broad safe validation status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\); repository-local discovery evidence; candidate command\(s\) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action/);
+});
+
+test('gatekeeper consumes targeted-vs-broad evidence and blocks missing or blocking broad validation', async () => {
+    const text = await read(reviewCycleGatekeeperPath);
+
+    assert.match(text, /Verification evidence after fixes, separated into targeted verification and Broad Safe Validation Gate evidence when PR-review fixes are in scope/);
+    assert.match(text, /broad evidence must include status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\), repository-local discovery evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, command classification basis, dirty-state boundary result when executed, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(text, /Targeted checks alone do not satisfy this rule when broad safe validation is available/);
+    assert.match(text, /`passed` satisfies the rule only when the evidence is fresh for the final candidate worktree\/fix batch/);
+    assert.match(text, /`failed`, `blocked`, stale evidence, and unknown freshness make the gate emit `BLOCK`/);
+    assert.match(text, /a failed selected broad safe validation remains blocking until its failure is addressed, or until the workflow is re-scoped or reclassified so that command is no longer the selected broad safe validation/);
+    assert.match(text, /`skipped` and `not applicable` are valid only when the evidence includes inspected repository-local basis, candidate command\(s\) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(text, /`mutating-only` is not a pass[\s\S]+either a separately reported authorized mutating\/output-writing run with dirty-state\/output boundaries, or an accepted residual-risk rationale that explicitly covers not running it/);
+    assert.match(text, /Otherwise the gate emits `BLOCK` for missing evidence/);
+    assert.match(text, /missing, failed, blocked, stale, or unknown freshness broad safe validation emits `BLOCK`/);
+    assert.match(text, /Reject targeted-only evidence when broad safe validation is available, and emit `BLOCK` for missing, failed, blocked, stale, or unknown freshness broad validation evidence/);
+    assert.match(text, /Broad Safe Validation Gate evidence: targeted verification status; broad safe validation status; repository-local discovery evidence; candidate command\(s\) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action; and whether the evidence is sufficient for this gate/);
+});
+
+test('gatekeeper requires broad-validation freshness evidence and blocks stale or unknown freshness', async () => {
+    const text = await read(reviewCycleGatekeeperPath);
+    const requiredInputsStart = text.indexOf('\n## Required Inputs');
+    const gateRulesStart = text.indexOf('\n## Gate Rules');
+    const decisionProcedureStart = text.indexOf('\n## Decision Procedure');
+    const outputFormatStart = text.indexOf('\n## Output Format');
+    const requiredInputs = text.slice(
+        requiredInputsStart,
+        text.indexOf('\n## Severity Vocabulary', requiredInputsStart),
+    );
+    const gateRules = text.slice(
+        gateRulesStart,
+        text.indexOf('\n## Waiver Rules', gateRulesStart),
+    );
+    const decisionProcedure = text.slice(
+        decisionProcedureStart,
+        text.indexOf('\n### Insufficient Input', decisionProcedureStart),
+    );
+    const outputFormat = text.slice(
+        outputFormatStart,
+        text.indexOf('\n## Anti-Patterns', outputFormatStart),
+    );
+
+    assert.match(requiredInputs, /freshness evidence for the final candidate worktree\/fix batch/);
+    assert.match(requiredInputs, /If contextual\/independent review, builder\/test follow-up, formatting, generated-output handling, or any other fix step changed the worktree after broad validation evidence was produced, that evidence is stale until rerun or explicitly re-established for the final changed surface/);
+    assert.match(requiredInputs, /stale or unknown freshness makes the gatekeeper emit `BLOCK`/);
+    assert.match(gateRules, /`passed` satisfies the rule only when the evidence is fresh for the final candidate worktree\/fix batch/);
+    assert.match(gateRules, /`failed`, `blocked`, stale evidence, and unknown freshness make the gate emit `BLOCK`/);
+    assert.match(gateRules, /missing, failed, blocked, stale, or unknown freshness broad safe validation emits `BLOCK`/);
+    assert.match(decisionProcedure, /emit `BLOCK` for missing, failed, blocked, stale, or unknown freshness broad validation evidence/);
+    assert.match(outputFormat, /Broad Safe Validation Gate evidence: targeted verification status; broad safe validation status; repository-local discovery evidence; candidate command\(s\) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action; and whether the evidence is sufficient for this gate/);
+    assert.match(outputFormat, /freshness: <fresh for final candidate worktree\/fix batch, stale, or unknown, with later-edit evidence>/);
+});
+
+test('gatekeeper Broad Safe Validation Gate sample template names candidate selection and dirty-state boundary fields', async () => {
+    const text = await read(reviewCycleGatekeeperPath);
+    const sample = text.slice(
+        text.indexOf('Broad Safe Validation Gate evidence:'),
+        text.indexOf('Waivers:', text.indexOf('Broad Safe Validation Gate evidence:')),
+    );
+
+    assert.match(sample, /- repository-local discovery evidence: <docs\/scripts\/config\/prior-local-evidence inspected>/);
+    assert.match(sample, /- candidate command\(s\) inspected: <commands or None>/);
+    assert.match(sample, /- selected command or unavailable-command conclusion: <selected command, or why none is selectable>/);
+    assert.match(sample, /dirty-state boundary result: <before\/after result or not executed>/);
+    assert.match(sample, /freshness: <fresh for final candidate worktree\/fix batch, stale, or unknown, with later-edit evidence>/);
+});
+
+test('orchestrator carries Broad Safe Validation Gate evidence through PR-review handoffs and readiness', async () => {
+    const text = await read(orchestratorPath);
+
+    assert.match(text, /require the Broad Safe Validation Gate after targeted fix verification succeeds and before push readiness, reviewer-facing replies, or review-thread resolution/);
+    assert.match(text, /Targeted checks alone do not satisfy broad validation when a broad safe candidate is available/);
+    assert.match(text, /Evidence must be fresh for the final candidate worktree\/fix batch/);
+    assert.match(text, /contextual\/independent review, builder\/test follow-up, formatting, generated-output handling, or any other later worktree edit invalidates earlier broad validation until rerun or explicitly re-established for the final changed surface/);
+    assert.match(text, /Failed, blocked, stale, or unknown freshness broad validation blocks progress; failed selected broad validation cannot be waived through residual risk/);
+    assert.match(text, /Skipped, not-applicable, or mutating-only outcomes may proceed only with inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
+    assert.match(text, /Mutating-only evidence is not a pass; it may proceed only after the authorized mutating\/output-writing command ran with reported dirty-state\/output boundaries, or after an accepted residual-risk rationale explicitly covers not running it/);
+    assert.match(text, /For PR-review fix cycles, it also consumes targeted verification and Broad Safe Validation Gate evidence with freshness state for the final candidate worktree\/fix batch/);
+    assert.match(text, /Missing, failed, blocked, stale, or unknown freshness broad safe validation blocks readiness; failed selected broad validation cannot be waived through residual risk/);
+    assert.match(text, /do not push, post reviewer-facing replies, or resolve threads until targeted fix verification has passed and the Broad Safe Validation Gate has a non-blocking status that is fresh for the final candidate worktree\/fix batch/);
+    assert.match(text, /Broad safe validation is selected from repository-local evidence by behavior-based command classification, not by language\/framework\/ecosystem preference/);
+    assert.match(text, /Broad Safe Validation Gate expectations for PR-review fixes: report targeted verification separately from broad safe validation; discover broad candidates from repository-local evidence only; classify candidates by behavior as local-only, approval-bound, forbidden, unavailable, skipped, not applicable, or mutating-only; report candidate command\(s\) inspected and the selected command or unavailable-command conclusion/);
+    assert.match(text, /For `mutating-only`, require either a separately reported authorized mutating\/output-writing run with dirty-state\/output boundaries, or an accepted residual-risk rationale that explicitly covers not running it/);
+    assert.match(text, /PR creation or preparation readiness also requires Broad Safe Validation Gate evidence when the branch carries those fixes[\s\S]+Apply the `workflow-safety-gates` PR Readiness Evidence Gate status semantics/);
+    assert.match(text, /`skipped` and `not applicable` satisfy readiness only with the full inspected evidence package and policy\/risk basis/);
+    assert.match(text, /`mutating-only` is not a pass; it satisfies readiness only with that full package plus either separately reported authorized mutating\/output-writing command results with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covering not running it/);
+    assert.match(text, /Broad Safe Validation Gate status when PR-review fixes are in scope: targeted verification status; broad safe validation status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\); repository-local discovery evidence; candidate command\(s\) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action/);
+});
+
+test('builder classifies builder-run PR-review checks or defers broad validation to test agent', async () => {
+    const text = await read(builderAgentPath);
+
+    assert.match(text, /When verification is in scope for a PR-review fix, classify builder-run checks as targeted verification or broad safe validation/);
+    assert.match(text, /If broad safe validation belongs to `test-agent` or cannot be selected under the current command boundaries, report the candidate command\(s\) inspected and selected command or unavailable-command conclusion explicitly instead of treating targeted checks as broad validation/);
+    assert.match(text, /Targeted vs broad safe validation when PR-review fixes are in scope:[\s\S]+candidate command\(s\) inspected; selected command or unavailable-command conclusion/);
+});
+
 test('Linear entrypoints and docs carry no-PR thread-state proof language', async () => {
     const paths = await existingPaths([linearSkillPath, linearPromptPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one linear entrypoint/doc path exists');
@@ -141,7 +501,6 @@ test('workflow safety gates deny Copilot PR creation as fallback or substitute',
     assert.match(text, /Copilot PR creation \| Blocked \| `mcp_github_create_pull_request_with_copilot` is denied/);
     assert.match(text, /Host\/tool availability, generic tool descriptions, visible tool schemas, or tool names that appear capable never override this pack allowlist/);
     assert.match(text, /If local push mechanics, branch publication, or exact PR creation is blocked, unavailable, or fails[\s\S]+stop with a blocked, local-ready, or PR-ready summary\/guidance/);
-    assert.match(text, /Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling/);
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
