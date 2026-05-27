@@ -23,6 +23,16 @@ const reviewCycleGatekeeperPath = '.github/skills/review-cycle-gatekeeper/SKILL.
 const testAgentPath = '.github/agents/test-agent.agent.md';
 const builderAgentPath = '.github/agents/builder-agent.agent.md';
 
+const prTemplateStatuses = [
+    'exactly-one-template-used',
+    'multiple-templates-user-selection-required',
+    'multiple-templates-selected-by-convention',
+    'blocked-on-template-choice',
+    'selected-template-unreadable-choice-required',
+    'no-template-fallback-used',
+    'unreadable-template-fallback-used',
+];
+
 async function read(path) {
     return readFile(path, 'utf8');
 }
@@ -54,6 +64,12 @@ function frontmatterValue(text, key) {
 
 function pathWithin(root, relativePath) {
     return relativePath ? join(root, ...relativePath.split('/')) : root;
+}
+
+function assertPrTemplateStatuses(text, label) {
+    for (const status of prTemplateStatuses) {
+        assert.match(text, new RegExp('`' + status + '`'), `${status} is included in ${label}`);
+    }
 }
 
 async function collectTree(root, relativePath = '') {
@@ -657,12 +673,56 @@ test('PR description template policy owns template discovery and operator-facing
     assert.match(text, /Ambiguity is based on readable templates, not total candidate count/);
     assert.match(text, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
     assert.match(text, /If multiple readable templates are found and no repository convention clearly selects one/);
+    assert.match(text, /Return `blocked-on-template-choice`/);
     assert.match(text, /list each readable candidate template path, include unreadable candidates as status evidence/);
     assert.match(text, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
     assert.match(text, /Template status is for the operator-facing notes outside the fenced PR body only/);
+    assert.match(text, /status as one of:[^\n]+blocked-on-template-choice/);
+    assertPrTemplateStatuses(text, 'PR description template policy status output');
     assert.match(text, /no-template-fallback-used/);
     assert.match(text, /unreadable-template-fallback-used/);
     assert.match(text, /The reviewer-facing PR body must not include any sentence that names the template's existence, absence, source, or fallback selection/);
+});
+
+test('Linear workflow reports canonical PR template status vocabulary', async () => {
+    const text = await read(linearSkillPath);
+    const output = text.slice(
+        text.indexOf('## Output Format'),
+        text.indexOf('## Linear Comment Audience and Content'),
+    );
+
+    assert.match(output, /\*\*PR template status:\*\* One of/);
+    assertPrTemplateStatuses(output, 'Linear PR template status output');
+});
+
+test('orchestrator Output Format reports canonical PR template status vocabulary', async () => {
+    const text = await read(orchestratorPath);
+    const output = text.slice(text.indexOf('## Output Format'));
+
+    assert.match(output, /PR template status when PR creation happens: one of/);
+    assertPrTemplateStatuses(output, 'orchestrator PR template status output');
+});
+
+test('workflow safety PR Template Gate reports canonical PR template status vocabulary', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const templateGate = text.slice(
+        text.indexOf('## PR Template Gate'),
+        text.indexOf('### PR Body Audience'),
+    );
+
+    assert.match(templateGate, /Operator-facing template status must be one of/);
+    assertPrTemplateStatuses(templateGate, 'workflow safety PR Template Gate');
+});
+
+test('orchestrator PR creation guidance blocks ambiguous template choice when it cannot ask', async () => {
+    const text = await read(orchestratorPath);
+    const guidanceStart = text.indexOf('\n## PR Creation Guidance\n');
+    const section = text.slice(
+        guidanceStart,
+        text.indexOf('\n## Output Format\n', guidanceStart),
+    );
+
+    assert.match(section, /blocked-on-template-choice/);
 });
 
 test('selected unreadable template blocks when readable alternatives exist', async () => {
@@ -693,6 +753,7 @@ test('selected unreadable template blocks when readable alternatives exist', asy
     assert.match(templatePolicy, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
 
     assert.match(templateGate, /selected-template-unreadable-choice-required/);
+    assert.match(templateGate, /blocked-on-template-choice/);
     assert.match(templateGate, /Ambiguity is based on readable templates, not total candidate count/);
     assert.match(templateGate, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
     assert.match(templateGate, /If multiple readable templates are found and repository convention does not clearly select one, ask the user before PR creation or PR-ready body publication/);
@@ -703,10 +764,12 @@ test('selected unreadable template blocks when readable alternatives exist', asy
 
     assert.match(rootLinear, /uses a single readable template as the PR body structure even if other candidates are unreadable/);
     assert.match(rootLinear, /multiple readable templates require a user choice/);
+    assert.match(rootLinear, /blocked-on-template-choice/);
     assert.match(rootLinear, /selected-template-unreadable-choice-required/);
     assert.match(rootLinear, /ask-or-block when a chosen template is unreadable but readable alternatives exist/);
     assert.match(guideTemplateGate, /uses a single readable template even if other candidates are unreadable/);
     assert.match(guideTemplateGate, /multiple readable templates are ambiguous/);
+    assert.match(guideTemplateGate, /blocked-on-template-choice/);
     assert.match(guideTemplateGate, /selected-template-unreadable-choice-required/);
     assert.match(guideTemplateGate, /ask-or-block when a chosen template is unreadable but readable alternatives exist/);
 });
@@ -801,6 +864,7 @@ test('Linear Issue to PR docs summary checks template choice before PR Body Audi
     assert.ok(prCreation > auditGate, 'PR creation follows PR Body Audit Gate in the summary');
     assert.match(section, /uses a single readable template even if other candidates are unreadable/);
     assert.match(section, /asks when multiple readable templates are unresolved and ambiguous/);
+    assert.match(section, /blocked-on-template-choice/);
     assert.match(section, /selected-template-unreadable-choice-required/);
     assert.match(section, /ask\/block when a chosen template is unreadable but readable alternatives exist/);
     assert.match(section, /complete selected-template\/fallback candidate body/);
