@@ -675,7 +675,8 @@ test('PR description template policy owns template discovery and operator-facing
     assert.match(text, /If multiple readable templates are found and no repository convention clearly selects one/);
     assert.match(text, /Return `blocked-on-template-choice`/);
     assert.match(text, /list each readable candidate template path, include unreadable candidates as status evidence/);
-    assert.match(text, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
+    assert.match(text, /If no template is found, return the fallback Markdown Template below with operator-facing status `no-template-fallback-used`/);
+    assert.match(text, /If exactly one candidate exists and is unreadable, or every candidate is unreadable, return the fallback Markdown Template below with operator-facing status `unreadable-template-fallback-used`/);
     assert.match(text, /Template status is for the operator-facing notes outside the fenced PR body only/);
     assert.match(text, /status as one of:[^\n]+blocked-on-template-choice/);
     assertPrTemplateStatuses(text, 'PR description template policy status output');
@@ -750,7 +751,8 @@ test('selected unreadable template blocks when readable alternatives exist', asy
     assert.match(templatePolicy, /best-guess readable template/);
     assert.match(templatePolicy, /user-selected or repository-convention-selected template is unreadable and at least one other candidate template is readable/);
     assert.match(templatePolicy, /Do not silently use the fallback template and do not silently switch to a readable alternative/);
-    assert.match(templatePolicy, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
+    assert.match(templatePolicy, /If no template is found, return the fallback Markdown Template below with operator-facing status `no-template-fallback-used`/);
+    assert.match(templatePolicy, /If exactly one candidate exists and is unreadable, or every candidate is unreadable, return the fallback Markdown Template below with operator-facing status `unreadable-template-fallback-used`/);
 
     assert.match(templateGate, /selected-template-unreadable-choice-required/);
     assert.match(templateGate, /blocked-on-template-choice/);
@@ -759,7 +761,8 @@ test('selected unreadable template blocks when readable alternatives exist', asy
     assert.match(templateGate, /If multiple readable templates are found and repository convention does not clearly select one, ask the user before PR creation or PR-ready body publication/);
     assert.match(templateGate, /ask the user to choose a readable template or confirm fallback use/);
     assert.match(templateGate, /If the workflow cannot ask, block/);
-    assert.match(templateGate, /If no template is found, exactly one candidate exists and is unreadable, or every candidate is unreadable/);
+    assert.match(templateGate, /If no template is found, use the workflow fallback body and state operator-facing template status `no-template-fallback-used`/);
+    assert.match(templateGate, /If exactly one candidate exists and is unreadable, or every candidate is unreadable, use the workflow fallback body and state operator-facing template status `unreadable-template-fallback-used`/);
     assert.doesNotMatch(templateGate, /selected template cannot be read, use the workflow fallback body/i);
 
     assert.match(rootLinear, /uses a single readable template as the PR body structure even if other candidates are unreadable/);
