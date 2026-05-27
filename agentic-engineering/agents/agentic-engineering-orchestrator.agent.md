@@ -9,6 +9,8 @@ tools:
   - vscode/askQuestions
   - linear/*
   - github/*
+  - github.vscode-pull-request-github/activePullRequest
+  - github.vscode-pull-request-github/resolveReviewThread
 agents:
   - vault-context-agent
   - research-agent
@@ -244,11 +246,12 @@ On rejection, the orchestrator MUST re-prompt the operator with the specific rea
 
 ## Updates for PR Review Comments Workflow
 - Requests like "address PR review comments" or "fix code review comments" should use `pr-review-comments-workflow`.
+- Treat `pr-review-comments-workflow` as the user-invocable coordinator. It delegates the focused internal skills in order: `pr-review-thread-context` for active PR/review-thread context and real IDs, `pr-review-comment-validation` for the six evidence-based classifications, `pr-review-fix-cycle` for Builder/Test verification, Broad Safe Validation Gate, commit hygiene, push, and pushed-visible confirmation, `pr-review-round-closure` for the `review-cycle-gatekeeper` handoff, and `pr-review-reply-resolve` for reply-before-resolve and partial-failure accounting.
 - For PR review-comment workflows, validate each comment before implementation against issue/spec, architecture decisions, current PR state, repository conventions, tests, and known tradeoffs/non-goals.
 - If a review comment is invalid/incorrect or out-of-scope, provide an evidence-based reply rather than making a code change.
 - For PR review-comment workflows, do not reply `addressed` or resolve threads until fixes are committed, pushed to the PR branch, and visible in the PR. If changes are local only, report local-only status and ask for permission/instructions instead of posting addressed replies.
 - For PR review-comment workflows, do not push, post reviewer-facing replies, or resolve threads until targeted fix verification has passed and the Broad Safe Validation Gate has a non-blocking status that is fresh for the final candidate worktree/fix batch. Broad safe validation is selected from repository-local evidence by behavior-based command classification, not by language/framework/ecosystem preference. Mutating, package-management, network, service-starting, environment-changing, and output-writing commands require explicit authorization and expected dirty-state boundaries; they are not ordinary broad safe validation, and authorization alone does not make them non-blocking evidence.
-- Within the remote MCP context boundary, GitHub MCP can be used for PR metadata and status reads, review comments/replies/resolution, and PR creation when allowed by the GitHub Remote Mutation Allowlist.
+- Within the remote MCP context boundary, GitHub MCP can be used for PR metadata and status reads, review comments/replies/resolution, and PR creation when allowed by the GitHub Remote Mutation Allowlist. The VS Code GitHub Pull Requests extension surfaces `github.vscode-pull-request-github/activePullRequest` and `github.vscode-pull-request-github/resolveReviewThread` are allowed only as documented in `workflow-safety-gates`: active PR context is read-only, and thread resolution requires a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
 - When a fix delegation derives from a reviewer finding that targets one instance of a class of bugs (bound check, type narrowness, sanitization, validation, error handling, retry, logging, null/empty handling, etc.), include the equivalence-class audit instruction described in `## Delegation Prompts` in the fix handoff. The audit is mandatory; if items in the equivalence class are intentionally deferred, name them explicitly and list them as follow-ups in the orchestrator's Output Format. The scope-cap, numeric reporting, and tracked-location rules from `## Delegation Prompts` apply identically here.
 
 ## Delegation Prompts

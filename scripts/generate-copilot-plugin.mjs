@@ -226,6 +226,43 @@ function stripFrontmatter(markdown) {
 }
 
 /**
+ * @param {string} markdown
+ * @param {Set<string>} generatedCommands
+ * @returns {string}
+ */
+function rewriteGuideLinksForPackage(markdown, generatedCommands) {
+  return markdown
+    .replaceAll('](../../.github/agents/', '](../../agents/')
+    .replaceAll('](../../.github/skills/', '](../../skills/')
+    .replace(
+      /\[([^\]]+)\]\(\.\.\/\.\.\/\.github\/prompts\/([^/)#]+)\.prompt\.md(#[^)]*)?\)/g,
+      (match, label, promptName, fragment = '') => {
+        const commandRelative = `commands/${promptName}.md`;
+        if (!generatedCommands.has(commandRelative)) {
+          return label;
+        }
+
+        return `[${label}](../../${commandRelative}${fragment})`;
+      },
+    );
+}
+
+/**
+ * @param {string} outputRoot
+ * @param {Set<string>} generatedCommands
+ * @returns {Promise<void>}
+ */
+async function rewriteGeneratedGuideIfPresent(outputRoot, generatedCommands) {
+  const guidePath = path.join(outputRoot, 'agentic-engineering/docs/README.md');
+  if (!(await pathExists(guidePath))) {
+    return;
+  }
+
+  const markdown = await readFile(guidePath, 'utf8');
+  await writeFile(guidePath, rewriteGuideLinksForPackage(markdown, generatedCommands), 'utf8');
+}
+
+/**
  * @param {string} repoRoot
  * @param {string} outputRoot
  * @param {string[]} collectedFiles
@@ -292,6 +329,7 @@ async function main() {
   }
 
   await mkdir(outputRoot, { recursive: true });
+  await rm(path.join(outputRoot, 'docs/agentic'), { recursive: true, force: true });
 
   /** @type {ManifestContents} */
   const manifestContents = {
@@ -329,10 +367,11 @@ async function main() {
   copiedFiles += await copyTreeIfPresent(
     repoRoot,
     outputRoot,
-    'docs/agentic',
-    'docs/agentic',
+    'agentic-engineering/docs',
+    'agentic-engineering/docs',
     manifestContents.docs,
   );
+  await rewriteGeneratedGuideIfPresent(outputRoot, new Set(manifestContents.commands));
 
   copiedFiles += await copyFileIfPresent(repoRoot, outputRoot, 'README.md', 'README.md');
 
