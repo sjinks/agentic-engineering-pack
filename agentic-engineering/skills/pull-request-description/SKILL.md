@@ -7,7 +7,7 @@ user-invocable: true
 
 # Pull Request Description
 
-This skill generates final, copy/pasteable Markdown PR descriptions from the current branch commits and verification context once development and review/fix iterations are complete, or whenever the user explicitly asks. It does not edit existing PR descriptions.
+This skill generates final, copy/pasteable Markdown PR descriptions from the current branch commits and verification context once development and review/fix iterations are complete, or whenever the user explicitly asks. It remains the user-invocable composer; internal support skills handle PR template policy and final PR body audit.
 
 ## When to Use
 - Finalizing a PR description after implementation, verification, and review/fix cycles are complete.
@@ -20,8 +20,9 @@ This skill generates final, copy/pasteable Markdown PR descriptions from the cur
 - If the user asks to update an existing PR body, return the prepared body plus blocked status: remote PR title/body updates are not currently approved by `workflow-safety-gates` unless a future exact PR-body-update workflow is added.
 - Do not call GitHub MCP mutation tools for PR body updates, and do not use any substitute remote mutation path for existing PR descriptions.
 - Do not treat this skill as a required step before every PR creation or PR update; use it when finalizing or when explicitly requested.
+- Do not ask users to choose internal support skills. Invoke `pr-description-template-policy` and `pr-description-body-audit` as part of this composer workflow.
 - Inspect commits before summarizing.
-- Preserve user-provided or repository Pull Request Template sections when supplied or discovered.
+- Preserve user-provided or repository Pull Request Template sections when supplied or discovered through `pr-description-template-policy`.
 - Do not claim tests/reviews/security checks that were not run.
 - Do not include secrets or sensitive data.
 
@@ -42,10 +43,9 @@ This skill generates final, copy/pasteable Markdown PR descriptions from the cur
 3. Inspect commit subjects and bodies, using conventional-commits and commit-body-guidelines as source quality signals.
 4. Summarize changed files/high-level diff.
 5. Collect validation and review evidence from workflow handoff or local checks.
-6. When generating a PR body for creation or final publication, check the target repository for a Pull Request Template in standard GitHub locations: `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `PULL_REQUEST_TEMPLATE.md`, `docs/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, and root/docs `PULL_REQUEST_TEMPLATE/*.md` directories when multiple templates are supported.
-7. Generate copy/pasteable Markdown.
-8. Before returning or emitting the fenced Markdown body, inspect the candidate PR body for accidental hard-wrapped paragraphs or list items. Repair any hard-wrapped paragraphs or list items before emitting; if you cannot confidently distinguish intentional Markdown structure (headings, blank lines, list items, fenced code blocks, tables, intentional `<br>`) from accidental hard wrapping, block and fail fast instead of returning a final body.
-9. Before returning the body, re-read it as a PR reviewer who has no knowledge of this workflow. Remove any sentence whose meaning depends on knowing the workflow, the skill names, or the MCP tooling. Move that information to the operator-facing notes outside the fenced code block. Specifically check the end of the body for a trailing line, footnote, or separator block beginning with `PR template status:` or any sentence describing how the body itself was structured ("Body follows the de-facto template ...", "fallback template used", "template observed in the existing commit-body and PR history"); if any such content appears, delete it from the body and put the diagnostic in the operator-facing notes. The `Adversarial-review pre-push:` line is a permitted exception only when the synthesis pre-push review actually ran to completion with a non-blocking verdict; it stays in the body for synthesis-based PRs (placed per the rule below the Markdown Template), and must be removed if it appears in a non-synthesis PR or in a trivial synthesis skip. It must also be removed after `Verdict: BLOCK`.
+6. Before candidate composition, invoke `pr-description-template-policy` to resolve Pull Request Template discovery, selection, fallback, blocked template-choice states, and operator-facing template status. If template choice is blocked, return the operator-facing blocker and do not emit a final fenced PR body.
+7. Generate the candidate copy/pasteable Markdown body from the selected template or fallback structure, commits, issue links, validation, review notes, risks, and follow-ups.
+8. Before final fenced Markdown emission, invoke `pr-description-body-audit` against the complete candidate body, selected template status, validation evidence, synthesis pre-push status, and any Verified non-changes items. Emit the repaired body only when the audit passes or repairs it; block instead of emitting when the audit reports blocked.
 
 ## Description Rules
 - Use commits as source of truth but consolidate duplicate/fixup history after commit hygiene.
@@ -53,15 +53,10 @@ This skill generates final, copy/pasteable Markdown PR descriptions from the cur
 - Summarize user-visible behavior and implementation highlights without dumping commit logs.
 - Include testing/validation honestly: state what was run in plain reviewer-facing terms (for example "Added unit tests for X; ran the auth suite locally"). Do not name the workflow specialists, MCP tools, handoff steps, or skills that performed the verification. If no validation was run, say so in one neutral sentence (for example "No tests run; documentation-only change."), not as a workflow diagnostic.
 - Include risks, follow-ups, or omitted validation when relevant.
-- Follow `PR Body Formatting Rules` below for source-level formatting; do not hard-wrap PR body paragraphs.
-- If a single Pull Request Template is found, use it as the PR body structure and fill the workflow summary, validation, issue links, review notes, and risks into the appropriate sections.
-- If multiple templates are found and no repository convention clearly selects one, ask the user with `vscode/askQuestions` before generating the final PR body. This skill does not declare `vscode/askQuestions` in its own frontmatter; the invoking agent (typically the orchestrator) must already have `vscode/askQuestions` granted.
-- If the invoking agent lacks `vscode/askQuestions` and the operator cannot route through the orchestrator (for example direct invocation from a host that does not expose the tool), do not silently pick a template. Instead, in the operator-facing notes OUTSIDE the fenced PR body, list each candidate template path, summarize each template's structure in one sentence, name the best-guess template plus the one-line rationale (closest section overlap with the workflow summary), and instruct the operator to confirm a template by replying in plain text. Do not emit the final fenced PR body until the operator confirms; report blocked-on-template-choice in the meantime.
-- If no template is found or the template cannot be read, fall back to the pack-generated Markdown Template below and state outside the body that no template was found or readable.
-- Do not assume GitHub MCP/API PR creation tools will auto-apply repository templates; compose the final PR body explicitly.
-- For synthesis-based documentation or skill PRs (see the `workflow-safety-gates` Glossary definition), include the pre-push adversarial-review status line verbatim in the PR body only when the synthesis pre-push review actually ran to completion with a non-blocking verdict. Use exactly one of: `Adversarial-review pre-push: no blocking findings` or `Adversarial-review pre-push findings: [summary]` followed by `How addressed: ...` on the next line. Place the line under the `Review Notes` section when the repository template/fallback exposes such a section, otherwise under a `## Pre-push Synthesis Review` heading near the end of the body. Do not include this line for PRs that are not synthesis-based, for trivial synthesis skips, or for `Verdict: BLOCK`. Trivial synthesis skips with rationale belong in operator-facing notes only.
-- Only the verbatim `Adversarial-review pre-push:` / `Adversarial-review pre-push findings: ... How addressed: ...` line may appear in the PR body. The orchestrator's Pre-push adversarial review status report (Execution status, Verdict, trigger basis, Round-N count, Round-count source, diff baseline, matched non-trivial class(es), skip considered/rejected/accepted evidence, Blocking findings count, Dedup applied against, Equiv-audit fired, skip rationale, and any sentinel strings such as `Round-N-metadata-unreadable sentinel`, `Pre-push-adversary-skip sentinel`, or `Equivalence-class audit override unavailable sentinel`) is operator-facing only and MUST never appear inside the fenced PR body, per the `workflow-safety-gates` Externally-Posted Content Gate.
-- For PRs that include intentional non-changes (code a reviewer might reasonably flag but that was deliberately preserved or deliberately removed), include a `## Verified non-changes` section in the PR body. The canonical rules for that section live in `agentic-engineering-orchestrator` `## PR Creation Guidance` and govern this skill's composition of the section. Each item MUST cite (a) the in-repo code path, (b) a one-sentence statement of the upstream contract or library behavior being relied on, and (c) the version-pin location — either a declared-dependency manifest entry (`package.json`, `Cargo.toml`, `go.mod`, language-equivalent) or a machine-readable vendored-pin location (`.gitmodules` commit SHA, `vendor/modules.txt`, `go.work`, a checked-in machine-readable pin file such as `third_party/<name>/VERSION` or `third_party/<name>/version.txt`, Cargo `[patch]` overrides, or the repository-convention equivalent machine-readable pin manifest). The pin-location citation MUST point to a machine-readable pin manifest path INSIDE the repository under review — no URLs, no off-repo paths. Forbidden inside `## Verified non-changes`: dependency-tree internal paths beyond the pin manifest itself (`node_modules/...`, `vendor/<library>/<source-file>:<line>`, `.venv/...`, `~/.cargo/registry/...`, language-equivalents); specific line numbers inside upstream library source; `/memories/repo/<topic>.md` paths or any other workflow-internal memory path; URLs of any form pointing at upstream library source (`https://github.com/<owner>/<repo>/blob/<sha>/<path>`, with or without `#L<n>` fragments); Codespace / `github.dev` / online-IDE URLs; package-registry deep links (`pkg.go.dev/<path>`, `crates.io/...`, `npmjs.com/...`); CI artifact URLs (Jenkins / CircleCI / Actions artifact links); absolute local filesystem paths (`/home/...`, `/Users/...`, `C:\Users\...`); lock-file interior line citations. Free-form README prose and archive filenames are NOT acceptable pin locations. When an item violates these rules, the composer drops the entire item from the section, lists the dropped item in operator-facing notes with the offending citation excerpt, and continues composing the rest of the body; do not silently strip only the forbidden text and ship a two-of-three-component item that reviewers may rely on, and do not silently drop the forbidden text into the body.
+- Use `pr-description-template-policy` for Pull Request Template discovery, selection, fallback, and operator-facing template status.
+- Use `pr-description-body-audit` to apply the canonical `workflow-safety-gates` PR Body Audit Gate for source-level formatting, hard-wrap checks, workflow leakage checks, template anti-narration, validation honesty, synthesis adversarial-review line legality, Verified non-changes citation validation, and output separation.
+- For synthesis-based documentation or skill PRs, compose only the adversarial-review PR-body line allowed by `pr-description-body-audit`; trivial synthesis skips with rationale belong in operator-facing notes only.
+- For PRs that include intentional non-changes, compose a `## Verified non-changes` section only with items that can satisfy `pr-description-body-audit` citation validation.
 - If commit history is not clean, say PR description generation is blocked until commit hygiene is complete or mark it as draft-only.
 - If review/fix cycles are still active or unresolved review comments remain, generate draft-only Markdown and state that final PR description publication should wait until review/fix completion.
 - If the request is to update an existing PR body, do not perform the update. Provide the copy/pasteable body and a blocked status explaining that existing PR body updates are not approved by the current workflow gates.
@@ -87,38 +82,17 @@ The PR body must contain only content useful to those audiences:
 - Risks, follow-ups, breaking changes, and migration notes.
 - Issue/Linear/GitHub links.
 
-The forbidden categories, positive rules, authorship-disclosure carve-out, and anti-pattern example are defined canonically in `workflow-safety-gates` Externally-Posted Content Gate. This section adds PR-body-specific guidance only.
+The forbidden categories, positive rules, authorship-disclosure carve-out, and anti-pattern example are defined canonically in `workflow-safety-gates` Externally-Posted Content Gate. PR-body-specific audit details live in `pr-description-body-audit`.
 
-PR-body-specific anti-narration rule about the PR template itself: do not include any sentence that names the template's existence, absence, source, or fallback selection. Specifically, do not include text such as `PR template status: ...`, `No pull_request_template.md exists in the repo`, `Body follows the de-facto template observed in ...`, `template observed in the existing commit-body and PR history`, `fallback template used`, `template unreadable`, or `multiple templates with user selection`. The structure of the body is its own evidence; the operator-facing notes carry the diagnostic.
-
-PR template status, validation source, omissions/warnings, and update status remain in the operator-facing notes OUTSIDE the fenced PR body code block (as already specified in Output Format). They do not appear inside the copy/pasteable PR body, and they do not appear as a trailing "PR template status:" line, footnote, or separator block at the bottom of the body.
+PR template status, validation source, omissions/warnings, and update status remain in the operator-facing notes outside the fenced PR body code block. They do not appear inside the copy/pasteable PR body.
 
 If the workflow has no audience-relevant content for a templated section (for example "Testing and Validation" when no tests were run and there is no honest one-line maintainer-facing statement to make), omit the section per the existing rule instead of filling it with workflow trace.
 
-## PR Body Formatting Rules
+## Template and Body Audit Support
 
-- do not hard-wrap PR body paragraphs or list items; one logical paragraph is one line in the Markdown source, and one list item is one line.
-- use hard line breaks only for real Markdown structure: paragraph breaks via a blank line, list items, headings, fenced code blocks, tables, and intentional `<br>` where needed.
-- the ~72-character body wrap from `commit-body-guidelines` and `conventional-commits` applies to commit bodies only; when consulting those skills as source quality signals, do not carry their wrap width into the PR body.
-- before emitting a final fenced body, self-check the candidate PR body for accidental hard-wrapped paragraphs or list items; repair them, or block if intentional Markdown structure (headings, blank lines, list items, fenced code blocks, tables, intentional `<br>`) cannot be distinguished from wrapping mistakes.
-- preserve formatting of fenced code blocks and tables verbatim; do not reflow code lines or table rows.
-- GitHub renders the PR body as Markdown and reflows paragraphs to the container width, so unwrapped source lines render correctly across viewports.
-
-## Markdown Template
-```markdown
-## Summary
-
-## Changes
-
-## Testing and Validation
-
-## Review Notes
-
-## Risks and Follow-up
-```
-- Review Notes can include code review/security/adversarial/dual-review arbitration notes if present.
-- For synthesis-based PRs (see the `workflow-safety-gates` Glossary "Synthesis-based documentation or skill change"), place the exact `Adversarial-review pre-push:` or `Adversarial-review pre-push findings: ... How addressed: ...` line under the `Review Notes` section only when the synthesis pre-push review actually ran to completion with a non-blocking verdict. Only when the repository's actual PR template lacks a Review Notes-equivalent section, append a `## Pre-push Synthesis Review` heading near the end of the body and place the line there. Do not add the heading when `Review Notes` is present. Do not add the heading for non-synthesis PRs, trivial synthesis skips, or `Verdict: BLOCK`.
-- Omit empty sections only if truly irrelevant.
+- Invoke `pr-description-template-policy` before candidate composition. It owns template discovery, exactly-one/multiple/none/unreadable behavior, fallback Markdown Template, no-template narration in the body, and operator-facing template status.
+- Invoke `pr-description-body-audit` before final fenced Markdown emission. It implements the canonical `workflow-safety-gates` PR Body Audit Gate and owns workflow/tool/MCP/skill leakage checks, PR-template anti-narration, hard-wrap repair/block behavior, validation honesty, synthesis adversarial-review PR-body line legality, Verified non-changes citation validation, and fenced-body versus operator-notes separation.
+- If either support skill is unavailable or reports blocked, return blocked status and operator-facing notes instead of emitting a final fenced PR body.
 
 ## Output Format
 - PR description markdown in a fenced `markdown` code block only for the copy/pasteable body.

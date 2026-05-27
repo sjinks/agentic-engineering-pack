@@ -177,7 +177,9 @@ Review submission bodies (the top-level `body` on a submitted review, including 
 ## Integration with Pull Request Description
 
 - Mention `pull-request-description` only for explicit PR description update requests or for a final PR-body refresh after review-comment iterations are complete and the updated scope is settled; do not run it on every review-comment pass.
-- Do not update an existing PR description unless explicitly requested.
+- Treat explicit PR description update requests and final PR-body refreshes as PR-body composition/publication paths. Route through `pull-request-description` when available; otherwise apply the complete `workflow-safety-gates` PR Body Audit Gate checklist to the complete candidate body before returning any final fenced copy/paste PR body or PR-ready body.
+- Proceed only when the PR Body Audit Gate status is `pass` or `repaired`, using the audited body. If the audit is `blocked`, unavailable, ambiguous, or missing, do not emit a final fenced PR body or PR-ready body; return blocked status and operator-facing notes instead.
+- Do not update an existing PR description unless explicitly requested. If requested, existing PR description updates remain copy/paste-only; remote PR title/body updates stay blocked by `workflow-safety-gates`.
 - Add an output item for PR description status if relevant.
 - When a PR body refresh is requested, apply the `workflow-safety-gates` PR Template Gate's PR Body Audience sub-rule: PR template status, fallback selection, gatekeeper decisions, handoff state, and other workflow trace go in the operator-facing Output Format only — never in the PR body. Do not append a trailing `PR template status: ...` line, "Body follows the de-facto template ..." sentence, or other self-narration to the PR body.
 
