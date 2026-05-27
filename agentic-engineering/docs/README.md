@@ -8,7 +8,7 @@ The simplest mental model: one orchestrator controls the workflow, delegates sco
 
 The orchestrator owns workflow control and MCP integration. It decides which agent runs next, tracks gate outcomes, keeps Linear and GitHub access centralized through `linear/*` and `github/*`, and delegates private Obsidian project-note reads to a narrow vault specialist. Specialist-owned work requires an actual specialist or skill invocation with returned output, failure, or blocked status; a visible handoff log alone is not delegation. Linear/GitHub namespace-level grants are orchestrator-only because they include mutation tools and are not an enforceable read-only model for specialists. Obsidian vault context uses exact read-only tool grants instead of a broad namespace.
 
-Specialist agents are isolated by role and tool permissions. Builder and Test are edit-capable for implementation and verification work, while reviewers are read-only by default so they can evaluate outcomes independently. Research handles public web facts from orchestrator-provided context without local read/search/execute, and Environment Inspector handles read-only local tooling plus repository state/history reconnaissance without web or edit. Vault Context handles narrow Obsidian project-note context with exact read-only tools, provenance, and read/not-read boundaries. Workspace Scope is the only specialist that can use `vscode/runCommand`, and only for VS Code workspace-folder attach/remove/inspect operations. Specialists receive any needed Linear/GitHub/vault context as distilled orchestrator handoffs, not by direct broad namespace access. Each skill or agent handoff is logged visibly with purpose, expected output, and out-of-scope boundaries.
+Specialist agents are isolated by role and tool permissions. Builder and Test are edit-capable for implementation and verification work, while reviewers are read-only by default so they can evaluate outcomes independently. Research handles public web facts from orchestrator-provided context without local read/search/execute, and Environment Inspector handles read-only local tooling plus repository state/history reconnaissance without web or edit. Vault Context handles narrow Obsidian project-note context with exact read-only tools, provenance, and read/not-read boundaries. No specialist has automated VS Code workspace-folder command access; outside-workspace repositories require the operator to open or add the correct folder manually before work proceeds. Specialists receive any needed Linear/GitHub/vault context as distilled orchestrator handoffs, not by direct broad namespace access. Each skill or agent handoff is logged visibly with purpose, expected output, and out-of-scope boundaries.
 
 Skills act as reusable procedures and quality gates, not broad permission grants. A skill can standardize steps like commit hygiene or PR comment handling, but it does not override each agent's tool boundaries.
 
@@ -52,7 +52,6 @@ flowchart TD
 Specialists are role-isolated agents selected by the orchestrator based on the work needed.
 
 - Spec: requirements and Acceptance criteria.
-- Workspace Scope: attach, confirm, and detach external project folders for multi-root workspace access.
 - Vault Context: narrow read-only Obsidian project-note context with provenance and read/not-read boundaries.
 - Research: external public facts, official docs, standards, release notes, advisories, vendor docs, package docs, and product/domain research.
 - Environment Inspector: read-only local tooling, package script, dependency tree, package manager, toolchain, and repository state/history reconnaissance.
@@ -91,7 +90,6 @@ It does not produce a VSIX or Marketplace extension package.
 | Agent | Responsibility | Tool Class |
 | --- | --- | --- |
 | [Orchestrator](../../.github/agents/agentic-engineering-orchestrator.agent.md) | Coordinates workflow, delegates to specialists, ensures gates and verification. | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*` |
-| [Workspace Scope](../../.github/agents/workspace-scope-agent.agent.md) | Temporarily attaches, confirms, inspects, and detaches external project folders in VS Code. | `vscode/askQuestions`, `vscode/runCommand` |
 | [Vault Context](../../.github/agents/vault-context-agent.agent.md) | Retrieves narrow read-only Obsidian vault context and returns distilled summaries with provenance and read/not-read boundaries. | Exact Obsidian read-only tools only |
 | [Research](../../.github/agents/research-agent.agent.md) | Gathers external public facts from orchestrator-provided context when repository context is insufficient. | `web` |
 | [Environment Inspector](../../.github/agents/environment-inspector-agent.agent.md) | Performs read-only local tooling, package script, dependency tree, toolchain, and repository state/history reconnaissance. | `read`, `search`, `execute` |
@@ -137,7 +135,7 @@ It does not produce a VSIX or Marketplace extension package.
 graph TD
     User["User request"] --> Prompt["Prompt or direct agent entry"]
     Prompt --> Orchestrator["Agentic Orchestrator"]
-    Orchestrator --> Context["Context specialists\nWorkspace Scope, Vault Context, Research, Environment Inspector"]
+    Orchestrator --> Context["Context specialists\nVault Context, Research, Environment Inspector"]
     Context --> Orchestrator
     Orchestrator --> Spec["Spec Agent\nSpec readiness"]
     Spec --> Orchestrator
@@ -196,7 +194,7 @@ graph TD
     C -->|Invalid| D["Report Invalid<br/>Propose Linear Update<br/>Ask for Approval"]
     D --> E["End"]
     C -->|Valid| X{"External Project?"}
-    X -->|Yes| Y["Workspace Scope Agent<br/>Attach & Confirm Root"]
+    X -->|Yes| Y["Manual workspace preparation<br/>Open or add correct root"]
     X -->|No| F["Spec readiness and<br/>architecture gate"]
     Y --> F
     F -->|"blocked or scope amendment"| L["Report blocker"]
@@ -321,7 +319,7 @@ graph TD
 Agent and prompt `tools:` lists use two complementary forms:
 
 - **Bare capability names** such as `read`, `search`, `edit`, `execute`, `web`, `agent`, `todo`, and `browser` are platform-level capability classes the host grants to the agent. They are the primitives the agent can use directly.
-- **Path-style names** such as `linear/*`, `github/*`, `vscode/askQuestions`, `vscode/runCommand`, and exact VS Code MCP frontmatter grants like `obsidian/get_vault_file_partial` are scoped grants for specific tool surfaces. Wildcard forms (`linear/*`) grant access to an entire MCP namespace; exact names grant only that tool.
+- **Path-style names** such as `linear/*`, `github/*`, `vscode/askQuestions`, and exact VS Code MCP frontmatter grants like `obsidian/get_vault_file_partial` are scoped grants for specific tool surfaces. Wildcard forms (`linear/*`) grant access to an entire MCP namespace; exact names grant only that tool.
 
 Obsidian names have two equivalent notations depending on where they appear: `.agent.md` frontmatter uses VS Code grant names such as `obsidian/search_vault`, while prose, runtime logs, and protocol/tool names use `mcp_obsidian_...` names such as `mcp_obsidian_search_vault`. Both forms can describe exact read-only grants when one tool is listed per line. The forbidden form is the broad wildcard `obsidian/*`, because it grants the whole namespace including mutation tools.
 
@@ -347,11 +345,6 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 - Tools: `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*`
 - Responsibility: Orchestrates workflow, owns Linear/GitHub remote reads and gated remote mutations, delegates edits to Builder/Test, and passes distilled remote context to specialists.
 - Constraint: Does not edit production/test code directly; must verify delegated edits independently. `linear/*` and `github/*` remain orchestrator-only because namespace-level MCP grants include mutation tools and are not a hard read-only boundary.
-
-**Workspace Scope Tier** (VS Code Workspace Folder Scope)
-- Tools: `vscode/askQuestions`, `vscode/runCommand`
-- Responsibility: Attaches the narrowest useful external project root when real file access is needed, confirms the target folder, and detaches temporary folders after the workflow.
-- Constraint: Does not read/search repository files or inspect project contents. Uses `vscode/runCommand` only for VS Code workspace-folder operations, and `vscode/askQuestions` only for target path ambiguity or approval; no edits, shell commands, git operations, branches, commits, pushes, PRs, or implementation work.
 
 **Vault Context Tier** (Exact Read-Only Obsidian Context)
 - Tools: frontmatter grants use `obsidian/search_vault`, `obsidian/search_vault_simple`, `obsidian/search_vault_smart`, `obsidian/get_vault_file`, `obsidian/get_vault_file_partial`, `obsidian/get_files_by_tag`, `obsidian/get_backlinks`, `obsidian/get_outgoing_links`, `obsidian/list_vault_files`, and `obsidian/get_server_info`; prose and runtime references use the matching `mcp_obsidian_...` protocol/tool names.
@@ -393,8 +386,7 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 | `web` | Research, Architect, Security Tester | Research public external facts, architecture decisions, or authorized active security testing context | Read-only external documentation lookups for Research/Architect; Security Tester use is governed by the Authorization Contract and must not submit private or sensitive data outside approved scope. Security Reviewer does not have `web`. |
 | `execute` | Builder, Test, Environment Inspector, Security Tester | Local implementation checks, verification, read-only environment/repository inspection, and explicitly authorized active security testing depending on role | Mutating commands only where the role and workflow allow them; Environment Inspector is read-only and cannot install, update, fix, start services, or mutate git state. Reviewer agents and Integrator do not hold `execute`; they consume Environment Inspector evidence for command-backed local inspection. Approval-bound network reads or metadata-submitting commands, such as `git ls-remote` or `npm audit`, require explicit approval. |
 | `browser` | Test Agent | Browser-based testing when needed | Targeted verification; not for exploration |
-| `vscode/askQuestions` | Orchestrator, Spec Agent, Workspace Scope Agent | Clarify ambiguities, collect user decisions, request approvals | Use only when ambiguity blocks progress or approval is explicitly required |
-| `vscode/runCommand` | Workspace Scope Agent only | Attach, confirm, and detach VS Code workspace folders for external project access | Use only for workspace-folder operations; never for shell, implementation, verification, or git work |
+| `vscode/askQuestions` | Orchestrator, Spec Agent | Clarify ambiguities, collect user decisions, request approvals | Use only when ambiguity blocks progress or approval is explicitly required |
 
 ### Remote MCP Context Gate
 
@@ -436,20 +428,15 @@ Before invoking any skill workflow or specialist agent, the orchestrator logs a 
 
 The log is concise and excludes secrets, tokens, full remote payloads, MCP credentials, and excessive prompt text. The log must correspond to an actual skill or agent invocation; the orchestrator waits for output, failure, or blocked status before proceeding, and stops blocked rather than doing specialist-owned work directly when the required specialist or skill is unavailable. Multi-agent final reports include handoff log/status.
 
-### Orchestrator to Workspace Scope
+### Manual External Workspace Preparation
 
-When delegating external project scope, the orchestrator provides:
-- Requested external project path or identifying context.
-- Why file access is needed.
-- Any known safe root or directories to avoid.
-- Whether the folder should be detached after completion or kept open for review.
+When the requested work targets a repository outside attached workspace folders, the orchestrator does not delegate attachment or cleanup. It stops before spec, design, implementation, test, local verification, branch/git mechanics, commits, push, or PR creation and asks the operator to open or add the correct repository folder manually.
 
-Workspace Scope returns:
-- Target project root.
-- Attached and detached folders.
-- Ambiguity or approval status.
-- Cleanup status.
-- Whether no attach was needed.
+Before work resumes, the orchestrator records:
+- Target repository or folder requested.
+- Operator confirmation that the folder is attached to the current workspace.
+- Confirmed target workspace folder.
+- Any residual scope ambiguity or reason work remains blocked.
 
 ### Orchestrator to Vault Context
 
@@ -722,17 +709,17 @@ The workflow composes the PR body explicitly from the selected template or fallb
 
 ### External Project Scope Gate
 
-**Outside Workspace Project -> Workspace Scope Confirmation First**
+**Outside Workspace Project -> Manual Workspace Preparation First**
 
 When the requested work targets a project outside attached workspace folders:
 
-1. Orchestrator delegates attach/confirm to `workspace-scope-agent` before implementation, tests, local verification, branch/git mechanics, commits, push, or PR work.
-2. Workspace Scope attaches only the narrowest useful project root and asks with `vscode/askQuestions` when the path is ambiguous, broad, missing, or sensitive.
-3. Workspace Scope confirms the target workspace folder after attach, or reports that no attach was needed.
-4. Implementation, verification, git, and PR work remain delegated to the appropriate non-scope specialists.
-5. After the task, Workspace Scope detaches only folders temporarily attached for the workflow unless the user asks to keep them open.
+1. Orchestrator stops before implementation, tests, local verification, branch/git mechanics, commits, push, or PR work.
+2. The operator opens or adds the correct repository folder to the VS Code workspace manually.
+3. The operator confirms the target workspace folder, and the confirmed folder must be the narrowest useful project root.
+4. Implementation, verification, git, and PR work remain delegated to the appropriate specialists only after confirmation.
+5. No automated workspace attachment, detachment, or cleanup is performed by the pack.
 
-Prevents: Working in the wrong repository, over-broad workspace access, accidental access to sensitive directories, and giving the orchestrator broad command permissions.
+Prevents: Working in the wrong repository, over-broad workspace access, accidental access to sensitive directories, and giving the pack broad workspace command permissions.
 
 ### Local Environment and Git Reconnaissance Gate
 
@@ -837,7 +824,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 
 1. User runs [Run Agentic Engineering](../../.github/prompts/run-agentic-engineering.prompt.md) with a task description.
 2. Orchestrator restates the goal, identifies risks, and creates a task list.
-3. If the task targets an external project, delegates to Workspace Scope to attach and confirm the target root before work proceeds.
+3. If the task targets an external project, stops until the operator opens or adds the correct repository folder and confirms the target root.
 4. Delegates to Vault Context if narrow private project-note context is useful for requirements, prior decisions, threat models, or edge cases.
 5. Delegates to Research if public external facts are missing, or to Environment Inspector if local tooling/dependency/git state/history reconnaissance is needed before selecting commands, preparing commit hygiene, creating PRs, or making history-sensitive spec/architecture decisions.
 6. Records `Spec status` and `Spec readiness` when spec-first applies; blocked specs stop, partial specs delegate only named ready portions, and skipped specs need a rationale.
@@ -846,8 +833,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 9. Delegates to Test for test planning and verification, including `Test-gap plan status` and dirty-state expectations for execute/browser checks.
 10. Requests review from appropriate reviewers (Security Reviewer, Adversary, Code Reviewer) based on risk. Active testing is routed to Security Tester only after an explicit user request and full Authorization Contract.
 11. Converts severity-bearing reviewer findings into a test-gap plan when a fix cycle follows; then runs fix, verification, review arbitration, and review-cycle gatekeeper as needed.
-12. Delegates cleanup to Workspace Scope for temporary external folders unless the user asks to keep them open.
-13. Reports final result with `Readiness decision`, validation performed, gatekeeper or no-fix-cycle evidence, thread-state evidence, research/environment/vault findings when applicable, workspace cleanup when applicable, and residual risks.
+12. Reports final result with `Readiness decision`, validation performed, gatekeeper or no-fix-cycle evidence, thread-state evidence, research/environment/vault findings when applicable, manual workspace-preparation status when applicable, and residual risks.
 
 ### Linear Issue to PR
 
@@ -894,7 +880,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 | Stale or missing PR thread evidence | Review Closure and Thread-State Gate requires fresh thread snapshots or `thread state: not applicable - no PR exists yet` with proof. |
 | Unauthorized active security testing | Security Testing Authorization Gate keeps Security Reviewer static and requires Security Tester Authorization Contract before active probing. |
 | Automatic Linear updates | Orchestrator proposes Linear changes but requires explicit user approval before updating. No automatic status/comment/label changes. |
-| Wrong external project scope | External Project Scope Gate requires Workspace Scope to attach and confirm the narrow project root before implementation or git work. |
+| Wrong external project scope | External Project Scope Gate requires manual operator confirmation of the narrow project root before implementation or git work. |
 | Over-broad reconnaissance permissions | Research and Environment Inspector split public web facts from local execute-based inspection. |
 | Unapproved dependency metadata submission | Local Environment Reconnaissance Gate requires approval for `npm audit` and similar network/submission commands. |
 | Accidental package mutation during inspection | Environment Inspector forbids fix, update, install, and service-start commands, including `npm audit fix`. |

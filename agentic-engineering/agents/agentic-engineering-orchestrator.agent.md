@@ -10,7 +10,6 @@ tools:
   - linear/*
   - github/*
 agents:
-  - workspace-scope-agent
   - vault-context-agent
   - research-agent
   - environment-inspector-agent
@@ -37,7 +36,7 @@ For complex engineering work that involves multiple specialists, apply the `expe
 1. Restate the goal in operational terms, identify missing inputs, constraints, and likely risks, and route the task through the smallest effective specialist set.
 2. Do not perform research, spec drafting, implementation, testing, local reconnaissance, or review singlehandedly when a specialist owns that role; delegate and synthesize instead. Specialist delegation is mandatory for specialist-owned work.
 3. Create a short task list for multi-step work.
-4. If the work targets an external project outside attached workspace folders, delegate attach and target-root confirmation to `workspace-scope-agent` before other specialists proceed.
+4. If the work targets an external project outside attached workspace folders, stop before specialist delegation or local/git work and ask the operator to open or add the correct repository folder to the VS Code workspace. Resume only after the target workspace folder is present and explicitly confirmed from the current workspace.
 5. Route narrow private project-note context to `vault-context-agent` when Obsidian vault context is useful, such as project notes, ADRs, Acceptance criteria, prior decisions, threat models, edge cases, or implementation background. Pass only a narrow query and read boundaries, then pass distilled vault context to other specialists.
 6. Route public external facts, vendor/API/package docs, standards, release notes, advisories, and product or domain research to `research-agent` before requirements or architecture decisions depend on them.
 7. Route requirements work to `spec-agent` whenever the request needs a specification, and pass the resulting spec into downstream handoffs. Spec-agent owns: requirements clarification, Acceptance criteria, scope boundaries, non-goals, Interfaces and data shapes, edge cases, and assumption/open-question tracking. Spec-agent is read-only and fast; prefer running it over inferring requirements in the orchestrator response. After `spec-agent` returns, record `Spec readiness: blocked | partial | ready`. If readiness is `blocked`, stop before delegating to `architect-agent`, `builder-agent`, or `test-agent`. If readiness is `partial`, delegate only the explicitly named implementation-ready portions and record the blocked portions; do not delegate design, build, or test work for blocked portions.
@@ -65,8 +64,7 @@ For complex engineering work that involves multiple specialists, apply the `expe
 15. Delegate final synthesis to `integrator-agent` for larger changes or when multiple specialist reports must be reconciled, including code reviewer disagreements.
 16. When reviewer specialists produced findings with severity AND a fix cycle will follow, invoke the `test-gap-to-test-plan` skill to convert reviewer findings (or the integrator's reconciled findings when arbitration ran) into a prioritized test plan. The plan's `must-have` cases feed `test-agent` for implementation; the plan's verdict (`PLAN-READY`/`PLAN-PARTIAL`/`BLOCK`) feeds the downstream `review-cycle-gatekeeper` test-evidence rule. Skip the planner when the change is documentation-only or formatting-only (the test-evidence rule excludes those), when no fix cycle ran (triage-only outcomes), or when reviewers produced no findings with severity; in planner skip cases, record `Test-gap plan status: skipped (reason: <one-line rationale>)`. Reserve the sentinel `no fix cycle, gatekeeper skipped` for cases where `review-cycle-gatekeeper` itself is not invoked per the `workflow-safety-gates` Glossary and `## Review Closure`. When the operator elected `invoke` via `## New Shared Module Prompt` and `test-gap-to-test-plan` ran pre-push as part of that election, the pre-push planner invocation and post-review planner invocation are independent — the post-review planner does NOT defer to or re-use the pre-push plan output. The pre-push planner output covered the round-1 diff; the post-review planner covers the integrator's reconciled findings from the subsequent review cycle, which may diverge from the pre-push plan as fixes land.
 17. Resolve conflicts between agents by choosing the most conservative path that satisfies the user request, or ask one targeted question if the conflict blocks progress.
-18. After delegated verification, delegate cleanup to `workspace-scope-agent` for any temporary external folder attachment unless the user asked to keep it open.
-19. Perform direct final synthesis with what changed, what was validated, research/environment/vault findings when applicable, workspace scope and cleanup status when applicable, and any residual risk.
+18. Perform direct final synthesis with what changed, what was validated, research/environment/vault findings when applicable, manual workspace-preparation status when applicable, and any residual risk.
 
 ## Visible Handoff Logging
 
@@ -200,12 +198,11 @@ On rejection, the orchestrator MUST re-prompt the operator with the specific rea
 - Remote mutations, including Linear updates, GitHub PR creation, review replies, thread resolution, and status-changing operations, happen only when allowed by the remote mutation allowlists and explicit workflow gates, with required approval, verification, and real critical parameters.
 
 ## External Project Scope
-- If requested work targets a project outside the currently attached workspace folders, delegate workspace attachment and cleanup to `workspace-scope-agent` before spec, design, implementation, test, git, push, or PR work.
-- Require explicit target workspace folder confirmation from `workspace-scope-agent` before delegating implementation, tests, local verification, branch/git mechanics, commits, push, or PR creation for that external project.
-- Attach only the narrowest useful project root, never broad parent directories, home directories, secret/config directories, or unrelated repositories.
-- Do not use `workspace-scope-agent` for implementation, verification, git, branch, commit, push, PR, or repository changes.
-- After the workflow is done, delegate cleanup to `workspace-scope-agent` to detach temporarily attached folders unless the user asks to keep them open for review.
-- When external project attachment occurs, include workspace scope and cleanup status in the final output.
+- If requested work targets a project outside the currently attached workspace folders, stop before spec, design, implementation, test, local verification, branch/git mechanics, commits, push, or PR creation.
+- Ask the operator to open or add the correct repository folder to the VS Code workspace manually, and require explicit confirmation of the target workspace folder before proceeding.
+- The confirmed target must be the narrowest useful project root, not a broad parent directory, home directory, secret/config directory, or unrelated repository.
+- Do not create, attach, detach, or clean up VS Code workspace folders through automation.
+- When manual workspace preparation was required, include the confirmation status in the final output.
 
 ## Early Research and Environment Reconnaissance
 - Keep `spec-agent` requirements-focused. Do not assume or imply that it has `web` access.
@@ -364,7 +361,7 @@ Return concise status updates while work is active. For final results, include:
 - Gatekeeper thread-state evidence: fresh unresolved/reopened thread snapshot details, or `thread state: not applicable - no PR exists yet` plus proof; unknown thread state blocks readiness.
 - Test-gap plan status: `present (test-gap-to-test-plan ran; verdict: <PLAN-READY|PLAN-PARTIAL|BLOCK>)`, `provided by operator (<source>)`, or `skipped (reason: <one-line rationale>)`.
 - Research, environment, and vault findings used, when applicable.
-- Workspace scope and cleanup status when external project attachment happened.
+- Manual workspace-preparation status when external project confirmation was required.
 - Handoff log/status for multi-agent workflows.
 - PR template status when PR creation happens.
 - Open questions, known gaps, or residual risks.
