@@ -106,7 +106,7 @@ Operator-facing evidence must include:
 - Targeted verification status and commands/evidence.
 - Broad safe validation status using the vocabulary above.
 - Candidate command(s) inspected, the selected command or unavailable-command conclusion, and repository-local evidence used for discovery.
-- Classification basis for `safe`, `approval-bound`, `unavailable`, `skipped`, `not applicable`, `blocked`, or `mutating-only` outcomes.
+- Classification basis for command-behavior outcomes (`local-only`, `approval-bound`, or `forbidden`) and status outcomes (`skipped`, `not applicable`, `blocked`, or `mutating-only`).
 - Dirty-state boundary evidence before/after any executed broad validation, when execution occurred.
 - Freshness evidence for the final candidate worktree/fix batch, including whether later edits occurred and how broad validation was rerun or re-established after them.
 - Proceed/block effect, residual risk, and next operator action.

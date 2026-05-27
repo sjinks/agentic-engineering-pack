@@ -259,7 +259,7 @@ test('PR review Broad Safe Validation Gate blocks failed or blocked broad valida
     assert.match(text, /`not applicable`: no meaningful broad validation exists[\s\S]+inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
     assert.match(text, /`mutating-only`: only mutating, network, service-starting, package-management, or output-writing candidates exist\. This is not a pass/);
     assert.match(text, /It may proceed only with freshness evidence for the final candidate worktree\/fix batch and after either the authorized mutating\/output-writing candidate actually ran and is reported separately with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covers not running it/);
-    assert.match(text, /Classification basis for `safe`, `approval-bound`, `unavailable`, `skipped`, `not applicable`, `blocked`, or `mutating-only` outcomes/);
+    assert.match(text, /Classification basis for command-behavior outcomes \(`local-only`, `approval-bound`, or `forbidden`\) and status outcomes \(`skipped`, `not applicable`, `blocked`, or `mutating-only`\)/);
     assert.match(text, /If the Broad Safe Validation Gate is missing, failed, blocked, stale, or not fresh for the final candidate worktree\/fix batch, do not push, do not post reviewer-facing replies, and do not resolve threads/);
     assert.match(text, /A valid `skipped` or `not applicable` status may proceed only when the output names inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
     assert.match(text, /Broad Safe Validation Gate: targeted verification status; broad safe validation status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\); candidate command\(s\) inspected; selected command or unavailable-command conclusion; repository-local discovery evidence; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action/);
@@ -504,6 +504,7 @@ test('workflow safety gates deny Copilot PR creation as fallback or substitute',
     assert.match(text, /Copilot PR creation \| Blocked \| `mcp_github_create_pull_request_with_copilot` is denied/);
     assert.match(text, /Host\/tool availability, generic tool descriptions, visible tool schemas, or tool names that appear capable never override this pack allowlist/);
     assert.match(text, /If local push mechanics, branch publication, or exact PR creation is blocked, unavailable, or fails[\s\S]+stop with a blocked, local-ready, or PR-ready summary\/guidance/);
+    assert.match(text, /^Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling\.$/m);
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
