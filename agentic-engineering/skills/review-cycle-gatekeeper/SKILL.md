@@ -43,7 +43,7 @@ Typical triggers:
 
 - Findings list with severity and current status.
 - Fix summary or commit list tied to findings.
-- Verification evidence after fixes (tests, checks, manual validation).
+- Verification evidence after fixes, separated into targeted verification and Broad Safe Validation Gate evidence when PR-review fixes are in scope. Targeted verification proves the specific finding or behavior; broad safe validation proves the broadest bounded, non-mutating, locally supported validation relevant to the changed surface. The broad evidence must include status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`), repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, dirty-state boundary result when executed, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. If contextual/independent review, builder/test follow-up, formatting, generated-output handling, or any other fix step changed the worktree after broad validation evidence was produced, that evidence is stale until rerun or explicitly re-established for the final changed surface; stale or unknown freshness makes the gatekeeper emit `BLOCK`.
 - Unresolved or reopened discussion thread list (may be empty; an empty list is a valid input, an unknown list is not). The thread list must be a fresh read taken after the PR head SHA reaches its current value (no pushes between the read and this invocation) and immediately before this invocation; stale snapshots are not valid input. The PR head SHA at the time of the thread read MUST match the PR head SHA at the time of invocation. If the freshness read fails, the PR head SHA at read time differs from the PR head SHA at invocation, or freshness state is unavailable, treat the thread list as unknown and the gatekeeper emits `BLOCK`.
 - Pushed-visible state per the `workflow-safety-gates` Glossary, anchored to the PR head SHA at the time of invocation. Each `fixed`-state finding's linked fix commit MUST be reachable from the PR head SHA in this Required Input; commits that exist only locally do not satisfy `fixed`. An unknown pushed-visible status or unknown PR head SHA is treated identically to unknown thread state — the gatekeeper emits `BLOCK` and names the missing input.
 
@@ -89,9 +89,10 @@ If a previously `fixed` finding is reopened by a reviewer, it returns to `open`.
 3. Every `Medium` finding must be `fixed`, `owned-with-remediation-plan`, or `waived-with-rationale`.
 4. Every `Low` finding must be tracked in one of the four declared states. `Low` findings never block merge regardless of state.
 5. Every functional fix must include test evidence or an explicit rationale for no test. A functional fix is any change that alters runtime behavior, a public contract, persisted state, or security posture; documentation-only and pure formatting changes are excluded.
-6. Every fix batch must include full re-review of touched areas, not only thread-level replies. A fix batch is the set of changes pushed in a single review round (one push or one PR update), regardless of how many commits it contains.
-7. Regressions introduced by fixes are treated as new findings, added to the findings matrix with their own severity and state, and additionally summarized in the "New regressions" output section for visibility.
-8. The gate passes only when every `Critical` finding is `fixed` or `waived-with-rationale` with the `Critical`-only waiver fields, every `High` finding is `fixed` or `waived-with-rationale` with the `High`-only waiver fields under `## Waiver Rules`, and every `Medium` finding is `fixed`, `owned-with-remediation-plan`, or `waived-with-rationale`. Any other state for a `Critical`, `High`, or `Medium` finding fails the gate.
+6. For PR-review fix cycles, Broad Safe Validation Gate evidence is required in addition to targeted verification. Targeted checks alone do not satisfy this rule when broad safe validation is available. `passed` satisfies the rule only when the evidence is fresh for the final candidate worktree/fix batch. `failed`, `blocked`, stale evidence, and unknown freshness make the gate emit `BLOCK`; a failed selected broad safe validation remains blocking until its failure is addressed, or until the workflow is re-scoped or reclassified so that command is no longer the selected broad safe validation. `skipped` and `not applicable` are valid only when the evidence includes inspected repository-local basis, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. `mutating-only` is not a pass; it is valid only when the evidence includes the same fields plus either a separately reported authorized mutating/output-writing run with dirty-state/output boundaries, or an accepted residual-risk rationale that explicitly covers not running it. Otherwise the gate emits `BLOCK` for missing evidence.
+7. Every fix batch must include full re-review of touched areas, not only thread-level replies. A fix batch is the set of changes pushed in a single review round (one push or one PR update), regardless of how many commits it contains.
+8. Regressions introduced by fixes are treated as new findings, added to the findings matrix with their own severity and state, and additionally summarized in the "New regressions" output section for visibility.
+9. The gate passes only when every `Critical` finding is `fixed` or `waived-with-rationale` with the `Critical`-only waiver fields, every `High` finding is `fixed` or `waived-with-rationale` with the `High`-only waiver fields under `## Waiver Rules`, every `Medium` finding is `fixed`, `owned-with-remediation-plan`, or `waived-with-rationale`, and any required Broad Safe Validation Gate evidence is non-blocking and fresh for the final candidate worktree/fix batch. Any other state for a `Critical`, `High`, or `Medium` finding fails the gate; missing, failed, blocked, stale, or unknown freshness broad safe validation emits `BLOCK`.
 
 ## Waiver Rules
 
@@ -134,8 +135,9 @@ A `Critical` waiver missing any of the four additional fields is invalid; the ga
 1. Map each finding to exactly one of the four declared states; reject any other label.
 2. Validate that every finding carries the artifacts listed in "Required Evidence Per State".
 3. Verify that fixes are linked to findings and that touched areas have been re-reviewed per the fix-batch rule in `## Gate Rules`.
-4. Check for newly introduced regressions and add them as findings per the regressions rule in `## Gate Rules`.
-5. Apply the Gate Rules and issue the final decision.
+4. For PR-review fix cycles, evaluate targeted verification and Broad Safe Validation Gate evidence separately. Reject targeted-only evidence when broad safe validation is available, and emit `BLOCK` for missing, failed, blocked, stale, or unknown freshness broad validation evidence.
+5. Check for newly introduced regressions and add them as findings per the regressions rule in `## Gate Rules`.
+6. Apply the Gate Rules and issue the final decision.
 
 ### Insufficient Input
 
@@ -154,6 +156,7 @@ Include:
 - Findings matrix with `id`, `severity`, `state`, `owner`, `evidence`. Regressions introduced by fixes appear here as their own rows.
 - Newly introduced regressions, summarized for visibility (each must also appear in the findings matrix).
 - Missing evidence.
+- Broad Safe Validation Gate evidence: targeted verification status; broad safe validation status; repository-local discovery evidence; candidate command(s) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree/fix batch; proceed/block effect; residual risk; next operator action; and whether the evidence is sufficient for this gate.
 - Waivers and whether each waiver is valid.
 - Gate decision: `pass`, `fail`, or `BLOCK`.
 - Exact blockers to clear before merge.
@@ -177,6 +180,13 @@ New regressions:
 
 Missing evidence:
 - <item or None>
+
+Broad Safe Validation Gate evidence:
+- targeted verification: <status/evidence>
+- repository-local discovery evidence: <docs/scripts/config/prior-local-evidence inspected>
+- candidate command(s) inspected: <commands or None>
+- selected command or unavailable-command conclusion: <selected command, or why none is selectable>
+- broad safe validation: <passed|failed|blocked|skipped|not applicable|mutating-only>; classification basis: <basis>; dirty-state boundary result: <before/after result or not executed>; freshness: <fresh for final candidate worktree/fix batch, stale, or unknown, with later-edit evidence>; proceed/block effect: <effect>; residual risk: <risk>; next operator action: <action>
 
 Waivers:
 - <id>: valid | invalid - <reason>

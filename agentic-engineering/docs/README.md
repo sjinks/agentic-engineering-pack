@@ -8,17 +8,19 @@ The simplest mental model: one orchestrator controls the workflow, delegates sco
 
 The orchestrator owns workflow control and MCP integration. It decides which agent runs next, tracks gate outcomes, keeps Linear and GitHub access centralized through `linear/*` and `github/*`, and delegates private Obsidian project-note reads to a narrow vault specialist. Specialist-owned work requires an actual specialist or skill invocation with returned output, failure, or blocked status; a visible handoff log alone is not delegation. Linear/GitHub namespace-level grants are orchestrator-only because they include mutation tools and are not an enforceable read-only model for specialists. Obsidian vault context uses exact read-only tool grants instead of a broad namespace.
 
-Specialist agents are isolated by role and tool permissions. Builder and Test are edit-capable for implementation and verification work, while reviewers are read-only by default so they can evaluate outcomes independently. Research handles public web facts from orchestrator-provided context without local read/search/execute, and Environment Inspector handles read-only local tooling plus repository state/history reconnaissance without web or edit. Vault Context handles narrow Obsidian project-note context with exact read-only tools, provenance, and read/not-read boundaries. Workspace Scope is the only specialist that can use `vscode/runCommand`, and only for VS Code workspace-folder attach/remove/inspect operations. Specialists receive any needed Linear/GitHub/vault context as distilled orchestrator handoffs, not by direct broad namespace access. Each skill or agent handoff is logged visibly with purpose, expected output, and out-of-scope boundaries.
+Specialist agents are isolated by role and tool permissions. Builder and Test are edit-capable for implementation and verification work, while reviewers are read-only by default so they can evaluate outcomes independently. Research handles public web facts from orchestrator-provided context without local read/search/execute, and Environment Inspector handles read-only local tooling plus repository state/history reconnaissance without web or edit. Vault Context handles narrow Obsidian project-note context with exact read-only tools, provenance, and read/not-read boundaries. No specialist has automated VS Code workspace-folder command access; outside-workspace repositories require the operator to open or add the correct folder manually before work proceeds. Specialists receive any needed Linear/GitHub/vault context as distilled orchestrator handoffs, not by direct broad namespace access. Each skill or agent handoff is logged visibly with purpose, expected output, and out-of-scope boundaries.
 
 Skills act as reusable procedures and quality gates, not broad permission grants. A skill can standardize steps like commit hygiene or PR comment handling, but it does not override each agent's tool boundaries.
 
-The workflow is gate-based: clarify readiness, gather context, run spec and architecture gates when triggered, implement, test, review, convert reviewer findings into a test-gap plan when a fix cycle follows, clean commits, push through delegated local git mechanics, confirm remote visibility, close review rounds through the gatekeeper, check the Pull Request Template, and create PRs through orchestrator-only `mcp_github_create_pull_request` when the PR path is active. No-PR paths still report thread-state evidence, such as `thread state: not applicable - no PR exists yet`, instead of pretending the PR surface was checked. Before any push or PR path involving commits, `commit-hygiene`, `conventional-commits`, and `commit-body-guidelines` are mandatory; unavailable commit skills block push/PR and produce local-status or PR-ready output instead.
+The workflow is gate-based: clarify readiness, gather context, run spec and architecture gates when triggered, implement, test, review, convert reviewer findings into a test-gap plan when a fix cycle follows, clean commits, push through delegated local git mechanics, confirm remote visibility, close review rounds through the gatekeeper, check the Pull Request Template, audit the complete selected-template/fallback PR body, and create PRs through orchestrator-only `mcp_github_create_pull_request` when the PR path is active. No-PR paths still report thread-state evidence, such as `thread state: not applicable - no PR exists yet`, instead of pretending the PR surface was checked. Before any push or PR path involving commits, `commit-hygiene`, `conventional-commits`, and `commit-body-guidelines` are mandatory; unavailable commit skills block push/PR and produce local-status or PR-ready output instead.
 
 High-risk agent-pack changes touching orchestrator workflow rules, tool grants, security boundaries, security-tester authorization, or multiple agent files require contextual plus independent review, or an explicit skip rationale/deference recorded before commit hygiene and PR readiness.
 
 The final report carries a first-class `Readiness decision: blocked | partial | ready | not ready`. `ready` requires complete specialist outputs, verification/check evidence, review/arbitration evidence, gatekeeper evidence or the explicit `no fix cycle, gatekeeper skipped` sentinel, thread-state freshness or no-PR proof, PR/template evidence when applicable, and explicit not-applicable rationales for skipped gates.
 
 PR description generation is intentionally final and on-demand. It is produced when changes are stable, not at the start of implementation.
+
+The user-facing composer remains `pull-request-description`. It invokes internal support skills `pr-description-template-policy` and `pr-description-body-audit` for template policy and final body audit; those support skills are marked `user-invocable: false` and should not be selected directly by users.
 
 ```mermaid
 flowchart TD
@@ -41,9 +43,10 @@ flowchart TD
     I -->|"no"| N["no fix cycle, gatekeeper skipped"]
     N --> M
     M --> O{"PR path?"}
-    O -->|"yes"| P["Template check and PR creation"]
+    O -->|"yes"| P["Template check and PR Body Audit Gate"]
     O -->|"no"| Q["No-PR thread-state evidence"]
-    P --> R["Final report with Readiness decision"]
+    P --> PA["Create PR with audited selected-template/fallback body"]
+    PA --> R["Final report with Readiness decision"]
     Q --> R
 ```
 
@@ -52,7 +55,6 @@ flowchart TD
 Specialists are role-isolated agents selected by the orchestrator based on the work needed.
 
 - Spec: requirements and Acceptance criteria.
-- Workspace Scope: attach, confirm, and detach external project folders for multi-root workspace access.
 - Vault Context: narrow read-only Obsidian project-note context with provenance and read/not-read boundaries.
 - Research: external public facts, official docs, standards, release notes, advisories, vendor docs, package docs, and product/domain research.
 - Environment Inspector: read-only local tooling, package script, dependency tree, package manager, toolchain, and repository state/history reconnaissance.
@@ -90,8 +92,7 @@ It does not produce a VSIX or Marketplace extension package.
 
 | Agent | Responsibility | Tool Class |
 | --- | --- | --- |
-| [Orchestrator](../../.github/agents/agentic-engineering-orchestrator.agent.md) | Coordinates workflow, delegates to specialists, ensures gates and verification. | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*` |
-| [Workspace Scope](../../.github/agents/workspace-scope-agent.agent.md) | Temporarily attaches, confirms, inspects, and detaches external project folders in VS Code. | `vscode/askQuestions`, `vscode/runCommand` |
+| [Orchestrator](../../.github/agents/agentic-engineering-orchestrator.agent.md) | Coordinates workflow, delegates to specialists, ensures gates and verification. | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*`, `github.vscode-pull-request-github/activePullRequest`, `github.vscode-pull-request-github/resolveReviewThread` |
 | [Vault Context](../../.github/agents/vault-context-agent.agent.md) | Retrieves narrow read-only Obsidian vault context and returns distilled summaries with provenance and read/not-read boundaries. | Exact Obsidian read-only tools only |
 | [Research](../../.github/agents/research-agent.agent.md) | Gathers external public facts from orchestrator-provided context when repository context is insufficient. | `web` |
 | [Environment Inspector](../../.github/agents/environment-inspector-agent.agent.md) | Performs read-only local tooling, package script, dependency tree, toolchain, and repository state/history reconnaissance. | `read`, `search`, `execute` |
@@ -114,7 +115,12 @@ It does not produce a VSIX or Marketplace extension package.
 | [Adversarial Review](../../.github/skills/adversarial-review/SKILL.md) | Performing adversarial review, red-team analysis, edge-case discovery, and failure-mode analysis. |
 | [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md) | Applying shared workflow safety gates for critical parameters, exact-tool remote mutation allowlists, Obsidian vault context, remote MCP context, branch/git preflight and delegation contracts, PR templates, and PR review visibility/thread resolution. |
 | [Linear Issue Workflow](../../.github/skills/linear-issue-workflow/SKILL.md) | Fetching Linear issues, triaging validity, creating branches, fixing issues, and creating GitHub PRs. |
-| [PR Review Comments Workflow](../../.github/skills/pr-review-comments-workflow/SKILL.md) | Addressing GitHub PR review comments end-to-end: fetch, validate, fix, test, commit, push, and reply/resolve. |
+| [PR Review Comments Workflow](../../.github/skills/pr-review-comments-workflow/SKILL.md) | User-invocable coordinator for GitHub PR review comments: context, validation, fix cycle, closure, reply/resolve. |
+| [PR Review Thread Context](../../.github/skills/pr-review-thread-context/SKILL.md) | Internal active PR/review-thread context and real-ID acquisition. |
+| [PR Review Comment Validation](../../.github/skills/pr-review-comment-validation/SKILL.md) | Internal evidence-based PR review comment classification. |
+| [PR Review Fix Cycle](../../.github/skills/pr-review-fix-cycle/SKILL.md) | Internal Builder/Test, verification, Broad Safe Validation Gate, commit, push, and visibility contract. |
+| [PR Review Round Closure](../../.github/skills/pr-review-round-closure/SKILL.md) | Internal review-cycle gatekeeper handoff preparation. |
+| [PR Review Reply Resolve](../../.github/skills/pr-review-reply-resolve/SKILL.md) | Internal reviewer-facing reply and thread-resolution contract. |
 | [Commit Hygiene](../../.github/skills/commit-hygiene/SKILL.md) | Preparing branch history for push/PR; removing no-op commits; ensuring commits are atomic and meaningful. |
 | [Conventional Commits](../../.github/skills/conventional-commits/SKILL.md) | Writing, validating, or revising Conventional Commit subject lines for pending or recent commits. |
 | [Commit Body Guidelines](../../.github/skills/commit-body-guidelines/SKILL.md) | Enforcing structured commit bodies with Rationale, Impact, and Validation sections. |
@@ -137,7 +143,7 @@ It does not produce a VSIX or Marketplace extension package.
 graph TD
     User["User request"] --> Prompt["Prompt or direct agent entry"]
     Prompt --> Orchestrator["Agentic Orchestrator"]
-    Orchestrator --> Context["Context specialists\nWorkspace Scope, Vault Context, Research, Environment Inspector"]
+    Orchestrator --> Context["Context specialists\nVault Context, Research, Environment Inspector"]
     Context --> Orchestrator
     Orchestrator --> Spec["Spec Agent\nSpec readiness"]
     Spec --> Orchestrator
@@ -196,7 +202,7 @@ graph TD
     C -->|Invalid| D["Report Invalid<br/>Propose Linear Update<br/>Ask for Approval"]
     D --> E["End"]
     C -->|Valid| X{"External Project?"}
-    X -->|Yes| Y["Workspace Scope Agent<br/>Attach & Confirm Root"]
+    X -->|Yes| Y["Manual workspace preparation<br/>Open or add correct root"]
     X -->|No| F["Spec readiness and<br/>architecture gate"]
     Y --> F
     F -->|"blocked or scope amendment"| L["Report blocker"]
@@ -217,7 +223,8 @@ graph TD
     O --> P{"Gatekeeper pass?"}
     P -->|No| V["Report gatekeeper blocker"]
     P -->|Yes| T["Check PR Template"]
-    T --> U["Create GitHub PR<br/>mcp_github_create_pull_request"]
+    T --> TA["PR Body Audit Gate<br/>pass/repaired complete body"]
+    TA --> U["Create GitHub PR<br/>with audited selected-template/fallback body<br/>mcp_github_create_pull_request"]
     U --> Z["Final report<br/>Readiness decision"]
     V --> Z
 ```
@@ -226,7 +233,7 @@ graph TD
 
 ```mermaid
 graph TD
-    A["Fetch PR & Comments<br/>github/*: PR metadata, review comments,<br/>real thread/comment IDs when available"] --> B["For Each Comment"]
+    A["Acquire PR Context<br/>orchestrator-owned github/* or approved active-PR read<br/>direct/no-grant routes through orchestrator or blocks"] --> B["For Each Comment"]
     B --> C["Classify Comment"]
     C --> D{Validation Gate}
     D -->|Already Addressed| E["Verify Current PR State<br/>confirm fix already visible"]
@@ -241,7 +248,8 @@ graph TD
     L -->|Valid| M["Delegate to Builder"]
     M --> N["Implement Fix"]
     N --> O["Run Tests"]
-    O --> P["Review if Needed"]
+    O --> BSV["Broad Safe Validation Gate<br/>fresh final-worktree evidence"]
+    BSV --> P["Review if Needed"]
     P --> QA["Test-gap plan status<br/>if reviewer findings feed a fix cycle"]
     QA --> Q["Commit Hygiene"]
     Q --> R["Conventional Commits"]
@@ -304,14 +312,15 @@ graph TD
     J --> K["User Approval if Rewriting"]
     K --> L["Shared-module durable record<br/>and verified-internals evidence if needed"]
     L --> M["Push to Branch<br/>delegated local git mechanics"]
-    M --> N["Check Pull Request Template<br/>Use template or fallback explicitly"]
+    M --> N["Check Pull Request Template<br/>Use selected template or fallback explicitly"]
     N --> O{Ready for PR Description?}
-    O -->|Later/On-demand| P["Use Template/Fallback Body<br/>no generated description"]
+    O -->|Later/On-demand| P["Use selected template/fallback body<br/>no generated description"]
     O -->|Now| Q["Pull Request Description Skill"]
     Q --> R["Generate from Commits,<br/>Review Context,<br/>and Template Status"]
-    R --> S["Create GitHub PR<br/>orchestrator-only<br/>mcp_github_create_pull_request"]
+    R --> S["PR Body Audit Gate<br/>pass/repaired complete body"]
     P --> S
-    S --> T["Final report<br/>Readiness decision"]
+    S --> T["Create GitHub PR<br/>with audited selected-template/fallback body<br/>orchestrator-only<br/>mcp_github_create_pull_request"]
+    T --> U["Final report<br/>Readiness decision"]
 ```
 
 ## Tool and Permission Model
@@ -321,7 +330,7 @@ graph TD
 Agent and prompt `tools:` lists use two complementary forms:
 
 - **Bare capability names** such as `read`, `search`, `edit`, `execute`, `web`, `agent`, `todo`, and `browser` are platform-level capability classes the host grants to the agent. They are the primitives the agent can use directly.
-- **Path-style names** such as `linear/*`, `github/*`, `vscode/askQuestions`, `vscode/runCommand`, and exact VS Code MCP frontmatter grants like `obsidian/get_vault_file_partial` are scoped grants for specific tool surfaces. Wildcard forms (`linear/*`) grant access to an entire MCP namespace; exact names grant only that tool.
+- **Path-style names** such as `linear/*`, `github/*`, `vscode/askQuestions`, and exact VS Code MCP frontmatter grants like `obsidian/get_vault_file_partial` are scoped grants for specific tool surfaces. Wildcard forms (`linear/*`) grant access to an entire MCP namespace; exact names grant only that tool.
 
 Obsidian names have two equivalent notations depending on where they appear: `.agent.md` frontmatter uses VS Code grant names such as `obsidian/search_vault`, while prose, runtime logs, and protocol/tool names use `mcp_obsidian_...` names such as `mcp_obsidian_search_vault`. Both forms can describe exact read-only grants when one tool is listed per line. The forbidden form is the broad wildcard `obsidian/*`, because it grants the whole namespace including mutation tools.
 
@@ -344,14 +353,9 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 ### Permission Tiers
 
 **Orchestrator Tier** (Coordination & Linear/GitHub Integration)
-- Tools: `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*`
+- Tools: `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*`, `github.vscode-pull-request-github/activePullRequest`, `github.vscode-pull-request-github/resolveReviewThread`
 - Responsibility: Orchestrates workflow, owns Linear/GitHub remote reads and gated remote mutations, delegates edits to Builder/Test, and passes distilled remote context to specialists.
-- Constraint: Does not edit production/test code directly; must verify delegated edits independently. `linear/*` and `github/*` remain orchestrator-only because namespace-level MCP grants include mutation tools and are not a hard read-only boundary.
-
-**Workspace Scope Tier** (VS Code Workspace Folder Scope)
-- Tools: `vscode/askQuestions`, `vscode/runCommand`
-- Responsibility: Attaches the narrowest useful external project root when real file access is needed, confirms the target folder, and detaches temporary folders after the workflow.
-- Constraint: Does not read/search repository files or inspect project contents. Uses `vscode/runCommand` only for VS Code workspace-folder operations, and `vscode/askQuestions` only for target path ambiguity or approval; no edits, shell commands, git operations, branches, commits, pushes, PRs, or implementation work.
+- Constraint: Does not edit production/test code directly; must verify delegated edits independently. `linear/*` and `github/*` remain orchestrator-only because namespace-level MCP grants include mutation tools and are not a hard read-only boundary. `github.vscode-pull-request-github/activePullRequest` is read-only PR context; `github.vscode-pull-request-github/resolveReviewThread` is allowed only by the exact thread-resolution gate.
 
 **Vault Context Tier** (Exact Read-Only Obsidian Context)
 - Tools: frontmatter grants use `obsidian/search_vault`, `obsidian/search_vault_simple`, `obsidian/search_vault_smart`, `obsidian/get_vault_file`, `obsidian/get_vault_file_partial`, `obsidian/get_files_by_tag`, `obsidian/get_backlinks`, `obsidian/get_outgoing_links`, `obsidian/list_vault_files`, and `obsidian/get_server_info`; prose and runtime references use the matching `mcp_obsidian_...` protocol/tool names.
@@ -389,12 +393,13 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 | --- | --- | --- | --- |
 | `linear/*` | Orchestrator only | Fetch issue context, comments, status, relations, linked PRs, determine triage decisions, propose Linear updates | Namespace-level grant includes mutation tools; not treated as enforceable read-only for specialists. Mutations require the Linear Remote Mutation Allowlist, exact tools/IDs, and explicit user approval. |
 | `github/*` | Orchestrator only | Repository metadata, PR metadata/comments/reviews/status reads, PR creation after verification, replies/resolution | Namespace-level grant includes mutation tools; not treated as enforceable read-only for specialists. Mutations require the GitHub Remote Mutation Allowlist. GitHub repository file mutation tools are denied pack-wide. |
+| `github.vscode-pull-request-github/activePullRequest` | Orchestrator only | Active PR context in VS Code | Exact read-only extension grant. It does not authorize replies, status changes, thread resolution, branch creation, repository file mutation, PR creation, or other mutation. |
+| `github.vscode-pull-request-github/resolveReviewThread` | Orchestrator only | VS Code PR extension review-thread resolution | Exact extension grant allowed only with a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe. |
 | Exact Obsidian read-only tools | Vault Context Agent only | Narrow private project-note context from Obsidian with provenance and read/not-read boundaries | Frontmatter grants are exact `obsidian/...` entries; prose/runtime names are matching `mcp_obsidian_...` tools. No broad wildcard or mutation/execute/template tools. |
 | `web` | Research, Architect, Security Tester | Research public external facts, architecture decisions, or authorized active security testing context | Read-only external documentation lookups for Research/Architect; Security Tester use is governed by the Authorization Contract and must not submit private or sensitive data outside approved scope. Security Reviewer does not have `web`. |
 | `execute` | Builder, Test, Environment Inspector, Security Tester | Local implementation checks, verification, read-only environment/repository inspection, and explicitly authorized active security testing depending on role | Mutating commands only where the role and workflow allow them; Environment Inspector is read-only and cannot install, update, fix, start services, or mutate git state. Reviewer agents and Integrator do not hold `execute`; they consume Environment Inspector evidence for command-backed local inspection. Approval-bound network reads or metadata-submitting commands, such as `git ls-remote` or `npm audit`, require explicit approval. |
 | `browser` | Test Agent | Browser-based testing when needed | Targeted verification; not for exploration |
-| `vscode/askQuestions` | Orchestrator, Spec Agent, Workspace Scope Agent | Clarify ambiguities, collect user decisions, request approvals | Use only when ambiguity blocks progress or approval is explicitly required |
-| `vscode/runCommand` | Workspace Scope Agent only | Attach, confirm, and detach VS Code workspace folders for external project access | Use only for workspace-folder operations; never for shell, implementation, verification, or git work |
+| `vscode/askQuestions` | Orchestrator, Spec Agent | Clarify ambiguities, collect user decisions, request approvals | Use only when ambiguity blocks progress or approval is explicitly required |
 
 ### Remote MCP Context Gate
 
@@ -402,7 +407,7 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 
 The shared source of truth is [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). In short: orchestrator owns `linear/*` and `github/*`, records what was read and what was not read, passes distilled evidence to specialists, and performs remote mutations only when exact-tool allowlists, approval, verification, and critical-parameter checks pass.
 
-GitHub remote mutations are limited to `mcp_github_create_pull_request`, exact review-thread resolve/unresolve tools with real thread node IDs, and exact PR review reply/comment tools after pushed-visible changes or verified no-change rationale. Merge, PR title/body/base/head updates, branch updates, Copilot review requests, GitHub issue comments, arbitrary PR review status changes, `mcp_github_create_pull_request_with_copilot`, and repository file writes are blocked unless a future workflow explicitly adds them. GitHub repository file mutation tools remain globally denied: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
+GitHub remote mutations are limited to `mcp_github_create_pull_request`; MCP review-thread resolve/unresolve through exact `mcp_github_pull_request_review_write` `resolve_thread`/`unresolve_thread` methods with real thread node IDs; VS Code PR extension review-thread resolve-only through exact `github.vscode-pull-request-github/resolveReviewThread` with real thread node IDs; and exact PR review reply/comment tools after pushed-visible changes or verified no-change rationale. Merge, PR title/body/base/head updates, branch updates, Copilot review requests, GitHub issue comments, arbitrary PR review status changes, `mcp_github_create_pull_request_with_copilot`, and repository file writes are blocked unless a future workflow explicitly adds them. GitHub repository file mutation tools remain globally denied: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
 
 Linear remote mutations are limited to issue comments and issue status/label/assignee/metadata updates inside Linear workflows after explicit user approval and exact tool/ID availability. If the exact Linear tool or ID is missing, the workflow stops with guidance instead of using a substitute mutation.
 
@@ -436,20 +441,15 @@ Before invoking any skill workflow or specialist agent, the orchestrator logs a 
 
 The log is concise and excludes secrets, tokens, full remote payloads, MCP credentials, and excessive prompt text. The log must correspond to an actual skill or agent invocation; the orchestrator waits for output, failure, or blocked status before proceeding, and stops blocked rather than doing specialist-owned work directly when the required specialist or skill is unavailable. Multi-agent final reports include handoff log/status.
 
-### Orchestrator to Workspace Scope
+### Manual External Workspace Preparation
 
-When delegating external project scope, the orchestrator provides:
-- Requested external project path or identifying context.
-- Why file access is needed.
-- Any known safe root or directories to avoid.
-- Whether the folder should be detached after completion or kept open for review.
+When the requested work targets a repository outside attached workspace folders, the orchestrator does not delegate attachment or cleanup. It stops before spec, design, implementation, test, local verification, branch/git mechanics, commits, push, or PR creation and asks the operator to open or add the correct repository folder manually.
 
-Workspace Scope returns:
-- Target project root.
-- Attached and detached folders.
-- Ambiguity or approval status.
-- Cleanup status.
-- Whether no attach was needed.
+Before work resumes, the orchestrator records:
+- Target repository or folder requested.
+- Operator confirmation that the folder is attached to the current workspace.
+- Confirmed target workspace folder.
+- Any residual scope ambiguity or reason work remains blocked.
 
 ### Orchestrator to Vault Context
 
@@ -716,23 +716,23 @@ Prevents: Fixing wrong issues, wasting effort on ambiguous or misscoped work, si
 
 **GitHub PR Creation -> Template Checked and Honored**
 
-The detailed checklist lives in [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR, the workflow checks standard template locations, uses a single clear template, asks the user when multiple templates are ambiguous, or falls back explicitly when no template is found/readable.
+The detailed checklist lives in [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR or publishing a PR-ready body, the workflow checks standard template locations, uses a single readable template even if other candidates are unreadable, asks the user when multiple readable templates are ambiguous, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask-or-block when a chosen template is unreadable but readable alternatives exist, or falls back explicitly when no template is found or no readable candidates exist.
 
 The workflow composes the PR body explicitly from the selected template or fallback. It does not assume GitHub MCP/API PR creation tools will auto-apply repository templates, and it includes PR template status in final reporting whenever PR creation happens.
 
 ### External Project Scope Gate
 
-**Outside Workspace Project -> Workspace Scope Confirmation First**
+**Outside Workspace Project -> Manual Workspace Preparation First**
 
 When the requested work targets a project outside attached workspace folders:
 
-1. Orchestrator delegates attach/confirm to `workspace-scope-agent` before implementation, tests, local verification, branch/git mechanics, commits, push, or PR work.
-2. Workspace Scope attaches only the narrowest useful project root and asks with `vscode/askQuestions` when the path is ambiguous, broad, missing, or sensitive.
-3. Workspace Scope confirms the target workspace folder after attach, or reports that no attach was needed.
-4. Implementation, verification, git, and PR work remain delegated to the appropriate non-scope specialists.
-5. After the task, Workspace Scope detaches only folders temporarily attached for the workflow unless the user asks to keep them open.
+1. Orchestrator stops before implementation, tests, local verification, branch/git mechanics, commits, push, or PR work.
+2. The operator opens or adds the correct repository folder to the VS Code workspace manually.
+3. The operator confirms the target workspace folder, and the confirmed folder must be the narrowest useful project root.
+4. Implementation, verification, git, and PR work remain delegated to the appropriate specialists only after confirmation.
+5. No automated workspace attachment, detachment, or cleanup is performed by the pack.
 
-Prevents: Working in the wrong repository, over-broad workspace access, accidental access to sensitive directories, and giving the orchestrator broad command permissions.
+Prevents: Working in the wrong repository, over-broad workspace access, accidental access to sensitive directories, and giving the pack broad workspace command permissions.
 
 ### Local Environment and Git Reconnaissance Gate
 
@@ -837,7 +837,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 
 1. User runs [Run Agentic Engineering](../../.github/prompts/run-agentic-engineering.prompt.md) with a task description.
 2. Orchestrator restates the goal, identifies risks, and creates a task list.
-3. If the task targets an external project, delegates to Workspace Scope to attach and confirm the target root before work proceeds.
+3. If the task targets an external project, stops until the operator opens or adds the correct repository folder and confirms the target root.
 4. Delegates to Vault Context if narrow private project-note context is useful for requirements, prior decisions, threat models, or edge cases.
 5. Delegates to Research if public external facts are missing, or to Environment Inspector if local tooling/dependency/git state/history reconnaissance is needed before selecting commands, preparing commit hygiene, creating PRs, or making history-sensitive spec/architecture decisions.
 6. Records `Spec status` and `Spec readiness` when spec-first applies; blocked specs stop, partial specs delegate only named ready portions, and skipped specs need a rationale.
@@ -846,8 +846,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 9. Delegates to Test for test planning and verification, including `Test-gap plan status` and dirty-state expectations for execute/browser checks.
 10. Requests review from appropriate reviewers (Security Reviewer, Adversary, Code Reviewer) based on risk. Active testing is routed to Security Tester only after an explicit user request and full Authorization Contract.
 11. Converts severity-bearing reviewer findings into a test-gap plan when a fix cycle follows; then runs fix, verification, review arbitration, and review-cycle gatekeeper as needed.
-12. Delegates cleanup to Workspace Scope for temporary external folders unless the user asks to keep them open.
-13. Reports final result with `Readiness decision`, validation performed, gatekeeper or no-fix-cycle evidence, thread-state evidence, research/environment/vault findings when applicable, workspace cleanup when applicable, and residual risks.
+12. Reports final result with `Readiness decision`, validation performed, gatekeeper or no-fix-cycle evidence, thread-state evidence, research/environment/vault findings when applicable, manual workspace-preparation status when applicable, and residual risks.
 
 ### Linear Issue to PR
 
@@ -858,17 +857,19 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 5. After implementation, verification, review, test-gap planning when needed, and commit hygiene pass, pushes to the branch via delegated local git mechanics and confirms the pushed commits are visible on the remote.
 6. Runs `review-cycle-gatekeeper` after remote visibility confirmation and before PR creation, passing `thread state: not applicable - no PR exists yet` with proof when no PR exists yet.
 7. Checks durable-record requirements such as shared-module prompt output and verified-internals evidence when they apply.
-8. Creates GitHub PR with `mcp_github_create_pull_request`, the Linear issue link, selected template or fallback body, and any required reviewer-facing durable records.
-9. Linear issue remains open (no automatic status updates) unless user explicitly approves.
+8. Checks the target repository for PR templates, uses a single readable template even if other candidates are unreadable, asks when multiple readable templates are unresolved and ambiguous, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask/block when a chosen template is unreadable but readable alternatives exist, and then selects the template or fallback body.
+9. Applies the PR Body Audit Gate to the complete selected-template/fallback candidate body and proceeds only with `pass` or `repaired` status.
+10. Creates GitHub PR with `mcp_github_create_pull_request`, the Linear issue link, the audited selected-template/fallback body, and any required reviewer-facing durable records.
+11. Linear issue remains open (no automatic status updates) unless user explicitly approves.
 
 ### Addressing PR Review Comments
 
 1. The user invokes the [PR Review Comments Workflow](../../.github/skills/pr-review-comments-workflow/SKILL.md) skill directly (it is marked `user-invocable: true`) with a PR URL or number, or asks the orchestrator to address PR review comments. There is no dedicated entry-point prompt for this workflow; the skill is the canonical entry point.
-2. Workflow fetches PR and comments via `github/*` MCP.
+2. The workflow acquires PR and comment context only from orchestrator-owned `github/*` reads, the approved VS Code active-PR read surface, or an orchestrator-mediated GraphQL fallback. The fallback must include `pageInfo { hasNextPage endCursor }` for both `reviewThreads` and nested `comments`, then exhaust needed cursors or report an incomplete/blocked snapshot. Direct invocation without orchestrator-provided context and without an approved active-PR read must block or route through the orchestrator; it must not imply direct `github/*` access.
 3. For each comment: validates against issue/spec/architecture/conventions/tests and optional distilled vault context when useful (Review Comment Validation Gate).
 4. Invalid comments: replies with evidence; no code change.
-5. Valid comments: delegates to Builder, runs Test verification, commits with hygiene/conventional/body checks.
-6. After push succeeds and fixes are visible: refreshes unresolved/reopened thread state, runs review-cycle gatekeeper, and replies to threads or marks resolved via `github/*` MCP only when the gate passes and the required real PR/review identifiers are available. Thread resolution specifically requires the actual review thread node ID.
+5. Valid comments: delegates to Builder, runs targeted Test verification, requires the Broad Safe Validation Gate with fresh final-worktree evidence, then commits with hygiene/conventional/body checks.
+6. After push succeeds and fixes are visible: refreshes unresolved/reopened thread state, runs review-cycle gatekeeper, and replies to threads or marks resolved only when the gate passes and the required real PR/review identifiers are available. Fix-backed or touched-file replies include the fix commit SHA; verified no-change, disagreement, or clarification replies cite their evidence/provenance and must not invent a fix SHA. Thread resolution specifically requires the actual review thread node ID.
 
 ### Final PR Description Generation
 
@@ -894,7 +895,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 | Stale or missing PR thread evidence | Review Closure and Thread-State Gate requires fresh thread snapshots or `thread state: not applicable - no PR exists yet` with proof. |
 | Unauthorized active security testing | Security Testing Authorization Gate keeps Security Reviewer static and requires Security Tester Authorization Contract before active probing. |
 | Automatic Linear updates | Orchestrator proposes Linear changes but requires explicit user approval before updating. No automatic status/comment/label changes. |
-| Wrong external project scope | External Project Scope Gate requires Workspace Scope to attach and confirm the narrow project root before implementation or git work. |
+| Wrong external project scope | External Project Scope Gate requires manual operator confirmation of the narrow project root before implementation or git work. |
 | Over-broad reconnaissance permissions | Research and Environment Inspector split public web facts from local execute-based inspection. |
 | Unapproved dependency metadata submission | Local Environment Reconnaissance Gate requires approval for `npm audit` and similar network/submission commands. |
 | Accidental package mutation during inspection | Environment Inspector forbids fix, update, install, and service-start commands, including `npm audit fix`. |

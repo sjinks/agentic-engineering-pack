@@ -53,6 +53,16 @@ If the task appears to meet spec-first, architecture-first, or test-gap planning
 - Forbidden commands include mutating probes, unapproved git state/history changes, `git fetch`, `git pull`, fetch-like remote operations, external-contact commands outside the approved boundary, unapproved service startup, dependency or environment mutation, and any command whose side effects cannot be bounded.
 - Validate and quote or literal-handle all untrusted command arguments, including paths, refs, filenames, test names, suite names, URL strings, and issue keys. If safe construction is impossible, block and report the reason.
 
+## Targeted and Broad Safe Validation
+
+- Distinguish targeted verification from broad safe validation in every verification report. Targeted verification proves the specific changed behavior or reviewer finding; broad safe validation is the broadest bounded, non-mutating, locally supported validation relevant to the changed surface.
+- Targeted checks alone do not satisfy broad safe validation when a broad safe candidate is available.
+- Discover broad safe validation candidates from repository-local evidence only: checked-in docs, local scripts, task definitions, tool configuration, prior local inspection, and handoff-provided repository evidence. Do not prefer, require, or reject commands because they belong to a particular language, framework, ecosystem, or package manager.
+- Classify candidate commands by behavior and evidence, not by name. Report whether each relevant candidate is `local-only`, `approval-bound`, `forbidden`, unavailable, skipped, not applicable, or mutating-only, name the inspected evidence for that classification, and identify the selected command or unavailable-command conclusion.
+- Mutating, package-management, dependency-changing, network-contacting, service-starting, environment-changing, and output-writing commands are not ordinary broad safe validation. They require explicit authorization naming the exact command, cwd/root, expected dirty-state/output paths, timeout or cleanup plan, and generated-artifact handling.
+- Broad safe validation evidence must be fresh for the final candidate worktree/fix batch. If contextual/independent review, builder/test follow-up, formatting, generated-output handling, or any other fix step changes the worktree after evidence was produced, report prior broad validation as stale until it is rerun or explicitly re-established for the final changed surface.
+- If broad safe validation is `failed`, `blocked`, stale, or has unknown freshness, report that downstream push/reply/thread-resolution readiness is blocked; failed selected broad validation cannot be waived through residual risk. If it is `skipped`, `not applicable`, or `mutating-only`, include the inspected evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. For `mutating-only`, proceed only after the authorized mutating/output-writing command ran and is reported separately with dirty-state/output boundaries, or after an accepted residual-risk rationale explicitly covers not running it.
+
 ## Dirty-State / Side-Effect Tracking
 - Before edits and before/after every `execute` or `browser` verification step, inspect the relevant dirty state/scope when available. In git workspaces, prefer scoped status/diff inspection for the affected files; in non-git workspaces, use scoped before/after manifests where practical.
 - Report new or changed files and classify each as intentional test edits, expected generated artifacts, pre-existing/user changes, or blockers.
@@ -84,5 +94,6 @@ Return:
 - Test-plan deviations or blockers.
 - No-test rationale when tests were not added or changed.
 - Coverage gaps or residual risks.
+- Targeted vs broad safe validation: targeted verification status and evidence; broad safe validation status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`); repository-local discovery evidence; candidate command(s) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree/fix batch; proceed/block effect; residual risk; next operator action.
 - Reviewer-derived fix audit counts when applicable, exactly as `audited: N, deferred: M`, with follow-up locations for every deferred item.
 - Gatekeeper evidence summary, including passed checks, failed checks, skipped checks, missing inputs, blind spots, and whether the evidence is sufficient for downstream `review-cycle-gatekeeper` evaluation.

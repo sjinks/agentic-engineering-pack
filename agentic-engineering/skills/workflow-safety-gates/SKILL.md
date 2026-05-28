@@ -159,17 +159,28 @@ A future repository-file-write workflow must explicitly define all of the follow
 
 Until such a workflow exists, repository file writes through GitHub MCP remain blocked.
 
+## GitHub Read-Only PR Context Surfaces
+
+The VS Code GitHub Pull Requests extension active-PR surface is approved for read-only PR context acquisition:
+
+- `github.vscode-pull-request-github/activePullRequest` may be used to identify the active PR, repository, branch, PR number, and related read-only metadata when a PR workflow requires current editor context.
+- This surface does not authorize replies, status changes, thread resolution, branch creation, repository file mutation, PR creation, or any other mutation.
+- Values read from this surface are real critical-parameter inputs only for the fields it actually returns. Missing IDs, node IDs, SHAs, owner/repo values, or branch values remain missing and must not be inferred.
+- GitHub MCP read paths, including review comment reads such as `get_review_comments`, remain valid when the orchestrator owns them; this extension read surface does not replace the MCP paths or loosen specialist `github/*` restrictions.
+- Direct invocation of a PR workflow without orchestrator-held `github/*` context and without an approved active-PR read result must block or route through orchestrator-mediated context acquisition. Do not imply a direct skill or specialist can fetch PR/comments through `github/*` when that grant is unavailable.
+
 ## GitHub Remote Mutation Allowlist
 
 Only the following GitHub remote mutations are approved by this pack, and only after the relevant workflow gates, approvals, visibility checks, and critical-parameter checks pass.
 
 | Action | Status | Exact tool or method requirement | Required gate |
 | --- | --- | --- | --- |
-| Create pull request | Approved | `mcp_github_create_pull_request` only | PR template, verified branch, real owner/repo/base/head/title/body |
-| Resolve or unresolve review thread | Approved | `mcp_github_pull_request_review_write` with method `resolve_thread` or `unresolve_thread` only | Real review thread node ID from GitHub data; pushed-visible addressed state |
-| Reply/comment on PR review feedback | Approved | Exact reply/comment tool for the intended surface: `mcp_github_add_pull_request_review_comment_to_pending_review` for pending reviews, or `mcp_github_pull_request_review_write` with method `create` for new reviews. Do not use `mcp_github_add_issue_comment` for PR review feedback. | Pushed-visible changes or verified no-change rationale; real PR/comment/thread IDs; the verified no-change rationale must cite a specific spec, non-goal, file:line, or reviewer SHA (see Glossary) |
-| Submit pending pull request review | Approved | `mcp_github_pull_request_review_write` with method `submit_pending_pull_request_review` (or the host MCP server's documented submit-pending-review method); the submission `event` parameter is `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`. Do not substitute the issue-comment tool. | Pushed-visible changes; the review body and any inline pending comments must already satisfy the Externally-Posted Content Gate; real PR ID and pending-review ID; explicit operator approval when the submitted event is `APPROVE` |
-| Delete pending pull request review | Approved | The host MCP server's documented delete-pending-review method on `mcp_github_pull_request_review_write` (or equivalent) | Real PR ID and pending-review ID; used only to abandon a pending review whose composed content was rejected by gates or by the operator |
+| Create pull request | Approved | `mcp_github_create_pull_request` only | PR template, PR Body Audit Gate `pass` or `repaired` for the complete candidate PR body, verified branch, real owner/repo/base/head/title/body |
+| Resolve or unresolve review thread via MCP | Approved | `mcp_github_pull_request_review_write` with method `resolve_thread` or `unresolve_thread` only | Real review thread node ID from extension/GitHub data; pushed-visible addressed state or verified no-change rationale; gatekeeper pass or allowed skip; no mutating probe |
+| Resolve review thread via VS Code PR extension | Approved | `github.vscode-pull-request-github/resolveReviewThread` only | Real review thread node ID from extension/GitHub data; pushed-visible addressed state or verified no-change rationale; gatekeeper pass or allowed skip; no mutating probe |
+| Reply/comment on PR review feedback | Approved | Exact reply/comment tool for the intended surface: `mcp_github_add_pull_request_review_comment_to_pending_review` for pending reviews, or `mcp_github_pull_request_review_write` with method `create` for new reviews. Do not use `mcp_github_add_issue_comment` for PR review feedback. | Pushed-visible changes or verified no-change rationale; real PR/comment/thread IDs; pending-review inline comments are staged only and are not posted evidence until submit-pending-review succeeds and visibility is confirmed; the verified no-change rationale must cite a specific spec, non-goal, file:line, or reviewer SHA (see Glossary) |
+| Submit pending pull request review | Approved | `mcp_github_pull_request_review_write` with method `submit_pending_pull_request_review` (or the host MCP server's documented submit-pending-review method); the submission `event` parameter is `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`. Do not substitute the issue-comment tool. | Pushed-visible changes; the review body and any inline pending comments must already satisfy the Externally-Posted Content Gate; real PR ID and pending-review ID; explicit operator approval when the submitted event is `APPROVE`; success must be confirmed before pending-review comments count as posted evidence |
+| Delete pending pull request review | Approved | The host MCP server's documented delete-pending-review method on `mcp_github_pull_request_review_write` (or equivalent) | Real PR ID and pending-review ID; used only to abandon a pending review whose composed content was rejected by gates or by the operator, or whose submission failed or cannot be confirmed |
 | Merge pull request | Blocked | None approved | Future workflow required |
 | Update PR title/body/base/head | Blocked | None approved | Future workflow required |
 | Update branch | Blocked | None approved | Future workflow required |
@@ -182,6 +193,8 @@ Only the following GitHub remote mutations are approved by this pack, and only a
 Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling.
 
 If the exact approved GitHub tool or required real IDs are missing, unavailable, ambiguous, or fail before completing the intended action, stop and provide guidance instead of trying a substitute mutation.
+
+Pending-review lifecycle rule: staging pending-review inline comments is not a posted reviewer-facing reply and does not satisfy reply-before-resolve evidence. If pending-review content fails the Externally-Posted Content Gate, do not submit it; delete or abandon any pending review that already contains rejected content before any thread resolution. If submit-pending-review fails or its GitHub-visible result is unconfirmed, block resolution and report the failed or unconfirmed submission separately from reply creation; never classify that path as `reply+resolve`.
 
 ## Linear Remote Mutation Allowlist
 
@@ -353,12 +366,17 @@ Linear-provided branch names are remote context, not automatically safe local co
 
 ## PR Template Gate
 
-Before GitHub PR creation:
+Before GitHub PR creation or PR-ready body publication:
 
 - Check standard template locations: `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `PULL_REQUEST_TEMPLATE.md`, `docs/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, and root/docs `PULL_REQUEST_TEMPLATE/*.md` directories when multiple templates are supported.
-- If exactly one template is found, compose the PR body using that template structure.
-- If multiple templates are found and repository convention does not clearly select one, ask the user before PR creation.
-- If no template is found or the selected template cannot be read, use the workflow fallback body and state that template status explicitly to the operator (see PR Body Audience below); do not state it inside the PR body itself.
+- Record every discovered candidate's readability status. Ambiguity is based on readable templates, not total candidate count; unreadable candidates are operator-facing evidence/status only unless the selected or repository-convention template itself is unreadable.
+- If exactly one readable template is found, compose the PR body using that template structure, even if other discovered candidates are unreadable. Report unreadable candidates to the operator only.
+- If multiple readable templates are found and repository convention clearly selects a readable one, compose the PR body using that template structure and report the convention evidence to the operator only.
+- If multiple readable templates are found and repository convention does not clearly select one, ask the user before PR creation or PR-ready body publication. If the workflow cannot ask, status is `blocked-on-template-choice` and PR creation or PR-ready body publication remains blocked.
+- If a user-selected or repository-convention-selected template is unreadable and at least one other candidate template is readable, status is `selected-template-unreadable-choice-required`: ask the user to choose a readable template or confirm fallback use before PR creation or PR-ready body publication. If the workflow cannot ask, block. Do not silently use the fallback body and do not silently switch to a readable alternative.
+- If no template is found, use the workflow fallback body and state operator-facing template status `no-template-fallback-used` (see PR Body Audience below); do not state it inside the PR body itself.
+- If exactly one candidate exists and is unreadable, or every candidate is unreadable, use the workflow fallback body and state operator-facing template status `unreadable-template-fallback-used` with unreadable path/error summary; do not state it inside the PR body itself.
+- Operator-facing template status must be one of: `exactly-one-template-used`, `multiple-templates-user-selection-required`, `multiple-templates-selected-by-convention`, `blocked-on-template-choice`, `selected-template-unreadable-choice-required`, `no-template-fallback-used`, or `unreadable-template-fallback-used`.
 - Do not assume GitHub MCP/API PR creation tools will auto-apply repository templates.
 
 ### PR Body Audience
@@ -384,6 +402,25 @@ If the only thing the PR body could say about a templated section (for example a
 
 Prevents: PR bodies that read as self-narrated workflow traces ("PR template status: ...", "Body follows the de-facto template ...") instead of human-authored review context.
 
+### PR Body Audit Gate
+
+Before a workflow sends a body to `mcp_github_create_pull_request`, publishes a PR-ready body for manual creation, or returns a final fenced copy/paste PR description, apply this canonical PR Body Audit Gate. This gate applies to every PR-body path in the pack, including the orchestrator's inline PR creation, direct `linear-issue-workflow` PR creation, and `pull-request-description`. The `pr-description-body-audit` support skill implements this gate for the composer; direct workflow paths apply the same checklist before creation or publication.
+
+The audit status is `pass`, `repaired`, or `blocked`. `pass` and `repaired` may proceed using the audited body. `blocked`, ambiguous hard-wrap/source interpretation, failed citation validation that leaves an incomplete `## Verified non-changes` item, or unresolved workflow/template leakage blocks `mcp_github_create_pull_request` and blocks PR-ready body publication until repaired and re-audited.
+
+The gate must verify all of the following:
+
+- Workflow, tool, MCP, host, handoff, support-skill, and template-status leakage is absent from the PR body and remains only in operator-facing output.
+- PR template narration is absent from the PR body; template status, fallback selection, unreadable-template details, validation source, omissions/warnings, and gate decisions remain operator-facing only.
+- Hard-wrapped paragraphs or list items are repaired before publication, or blocked when the workflow cannot confidently distinguish intentional Markdown structure from accidental hard wrapping. Fenced code blocks and tables remain verbatim.
+- Validation language is honest, reviewer-facing, and does not claim tests, reviews, security checks, pushes, approvals, or updates that did not occur.
+- Synthesis adversarial-review PR-body lines appear only in the legal forms and locations allowed for completed non-blocking synthesis pre-push reviews; trivial synthesis skips, blocked verdicts, and full pre-push telemetry remain operator-facing only.
+- `## Verified non-changes` items cite all required evidence: the in-repo code path, a one-sentence statement of the upstream contract or library behavior being relied on, and the in-repository machine-readable version-pin location such as a declared-dependency manifest entry, `.gitmodules`, `vendor/modules.txt`, `go.work`, Cargo `[patch]`, or checked-in version pin file.
+- `## Verified non-changes` items must not cite URLs, off-repo paths, dependency-tree internal source paths beyond the pin manifest itself, upstream source line numbers, lock-file interior line citations, free-form README prose, archive filenames, absolute local paths, online IDE links, CI artifact URLs, package-registry deep links, or workflow-internal memory paths. Drop the entire invalid item and report the offending citation excerpt to the operator; do not ship a partial item.
+- The final output separates the reviewer-facing body from operator-facing notes. PR title, source range, validation source, template status, omissions/warnings, dropped-item diagnostics, update status, and blocked status stay outside the fenced or posted PR body.
+
+Prevents: Direct PR creation paths bypassing the same PR-body leakage, citation, hard-wrap, synthesis-line, validation-honesty, and output-separation checks that the final description composer applies.
+
 ## PR Readiness Evidence Gate
 
 Before GitHub PR creation, require explicit evidence for each mandatory upstream step:
@@ -394,8 +431,11 @@ Before GitHub PR creation, require explicit evidence for each mandatory upstream
 - Commit readiness completed when commits are present: `commit-hygiene`, `conventional-commits`, and `commit-body-guidelines` were invoked/applied, or the workflow reports why commits are absent.
 - Handoff logs correspond to real skill/agent invocations and returned output, failure, or blocked status.
 - Mandatory pre-push adversarial review, when triggered, has operator-facing `Pre-push adversarial review status` evidence showing one of: `Execution status: completed` with a non-blocking `Verdict` (`CONCERNS` or `CLEAN`, or independent secondary-lens `defer to prior adversarial review` backed by a prior non-blocking adversary verdict); `Execution status: skipped` with a valid trivial risk-shape skip rationale; or `Execution status: not applicable` with true not-applicable evidence. `Execution status: completed` plus `Verdict: BLOCK` blocks PR creation.
+- Broad Safe Validation Gate evidence is required when PR-review fix cycles are in scope. The evidence must include: status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`), repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, dirty-state boundary result when executed, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. Missing, failed, blocked, stale, or unknown freshness evidence blocks PR creation readiness.
+- `skipped` and `not applicable` Broad Safe Validation Gate statuses satisfy readiness only when the output includes the full inspected evidence package and the policy/risk basis for accepting that status: repository-local discovery, candidate command(s), selected or unavailable command conclusion, classification basis, freshness for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action.
+- `mutating-only` is not a pass. It satisfies readiness only when the output includes the full inspected evidence package above AND either separately reported authorized mutating/output-writing command results with dirty-state/output boundaries, or an accepted residual-risk rationale explicitly covering not running the mutating/output-writing candidate.
 
-If any mandatory step was skipped, only logged without a real invocation, unavailable, failed, or blocked, do not create the PR. Stop with a blocked, local-status, or PR-ready summary that names the missing evidence.
+If any mandatory step was skipped without the required evidence, policy basis, or residual-risk basis, only logged without a real invocation, unavailable, failed, or blocked, do not create the PR. Valid evidence-backed `skipped` and `not applicable` statuses do not block solely because they are skips. Stop with a blocked, local-status, or PR-ready summary that names the missing evidence.
 
 ## PR Review Visibility and Thread Gate
 
@@ -406,6 +446,7 @@ Before replying to PR review comments as addressed or resolving threads:
 - Replies, review status mutations, and thread resolution require real PR/review critical parameters from GitHub data.
 - Thread resolution or unresolution requires the actual GitHub review thread node ID. A comment URL, file path, line number, review comment ID, inferred value, placeholder, or `dummy` value is not a valid substitute.
 - If the actual review thread node ID is unavailable, report resolution blocked instead of attempting `resolve_thread`/`unresolve_thread` or claiming resolution.
+- `github.vscode-pull-request-github/resolveReviewThread` is approved only for review-thread resolution with a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
 
 ## Handoff Log Hygiene
 
