@@ -407,7 +407,7 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 
 The shared source of truth is [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). In short: orchestrator owns `linear/*` and `github/*`, records what was read and what was not read, passes distilled evidence to specialists, and performs remote mutations only when exact-tool allowlists, approval, verification, and critical-parameter checks pass.
 
-GitHub remote mutations are limited to `mcp_github_create_pull_request`; MCP review-thread resolve/unresolve through exact `mcp_github_pull_request_review_write` `resolve_thread`/`unresolve_thread` methods with real thread node IDs; VS Code PR extension review-thread resolve-only through exact `github.vscode-pull-request-github/resolveReviewThread` with real thread node IDs; and exact PR review reply/comment tools after pushed-visible changes or verified no-change rationale. Merge, PR title/body/base/head updates, branch updates, Copilot review requests, GitHub issue comments, arbitrary PR review status changes, `mcp_github_create_pull_request_with_copilot`, and repository file writes are blocked unless a future workflow explicitly adds them. GitHub repository file mutation tools remain globally denied: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
+GitHub remote mutations are limited to `mcp_github_create_pull_request`; MCP review-thread resolve/unresolve through exact `mcp_github_pull_request_review_write` `resolve_thread`/`unresolve_thread` methods with real thread node IDs; VS Code PR extension review-thread resolve-only through exact `github.vscode-pull-request-github/resolveReviewThread` with real thread node IDs; and exact PR review reply/comment tools after pushed-visible changes or verified no-change rationale, including `mcp_github_add_reply_to_pull_request_comment` for direct replies to existing PR review comments with a proven numeric `commentId`. Merge, PR title/body/base/head updates, branch updates, Copilot review requests, GitHub issue comments, arbitrary PR review status changes, `mcp_github_create_pull_request_with_copilot`, and repository file writes are blocked unless a future workflow explicitly adds them. GitHub repository file mutation tools remain globally denied: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
 
 Linear remote mutations are limited to issue comments and issue status/label/assignee/metadata updates inside Linear workflows after explicit user approval and exact tool/ID availability. If the exact Linear tool or ID is missing, the workflow stops with guidance instead of using a substitute mutation.
 
@@ -429,7 +429,7 @@ Prevents: Broad vault browsing, accidental note mutation, leaking private note c
 
 The shared source of truth is [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Mutating calls require real IDs, URLs, node IDs, thread IDs, comment IDs, Linear update values, PR numbers, repo owner/name, branches, SHAs/ranges, file SHAs, and PR template paths when relevant. Placeholders, guesses, fabricated values, stale values, examples, and mutating probes are forbidden; missing values are fetched/read first or reported as blockers.
 
-PR review thread resolution keeps an extra local hard stop in the PR review workflow: `resolve_thread` requires the actual review thread node ID from GitHub PR thread data, and unavailable node IDs block resolution.
+PR review replies and thread resolution keep extra local hard stops in the PR review workflow: direct replies to existing PR review comments require a proven numeric `commentId` for the exact comment, while `resolve_thread` requires the actual review thread node ID from GitHub PR thread data. The two identifiers are not interchangeable, and unavailable or unsafe IDs block only the affected sub-action.
 
 Prevents: Placeholder-ID remote mutations, probing external systems with state-changing tools, false thread-resolution claims when GitHub review thread IDs were not available, and git history cleanup against guessed branches or ranges.
 
@@ -827,7 +827,7 @@ In the PR review comments workflow:
 3. Push to PR branch.
 4. Only after push succeeds, PR is updated, and the required real PR/review identifiers are available: reply "addressed" or resolve thread.
 5. If changes are local-only: report status and ask for permission before claiming addressed.
-6. If review thread node IDs are unavailable, do not attempt thread resolution; report that resolution is blocked by current GitHub output.
+6. If a direct reply `commentId` or review thread node ID is unavailable, stale, ambiguous, conflicting, or from an unsafe source, do not attempt that reply or resolution; report that the affected sub-action is blocked by current GitHub output.
 
 Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addressed replies with no visible changes, and placeholder-ID thread resolution.
 
@@ -869,7 +869,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 3. For each comment: validates against issue/spec/architecture/conventions/tests and optional distilled vault context when useful (Review Comment Validation Gate).
 4. Invalid comments: replies with evidence; no code change.
 5. Valid comments: delegates to Builder, runs targeted Test verification, requires the Broad Safe Validation Gate with fresh final-worktree evidence, then commits with hygiene/conventional/body checks.
-6. After push succeeds and fixes are visible: refreshes unresolved/reopened thread state, runs review-cycle gatekeeper, and replies to threads or marks resolved only when the gate passes and the required real PR/review identifiers are available. Fix-backed or touched-file replies include the fix commit SHA; verified no-change, disagreement, or clarification replies cite their evidence/provenance and must not invent a fix SHA. Thread resolution specifically requires the actual review thread node ID.
+6. After push succeeds and fixes are visible: refreshes unresolved/reopened thread state, runs review-cycle gatekeeper, and replies to threads or marks resolved only when the gate passes and the required real PR/review identifiers are available. Fix-backed or touched-file replies include the fix commit SHA; verified no-change, disagreement, or clarification replies cite their evidence/provenance and must not invent a fix SHA. Direct existing-comment replies require a proven numeric `commentId`; thread resolution specifically requires the actual review thread node ID.
 
 ### Final PR Description Generation
 

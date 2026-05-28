@@ -167,7 +167,7 @@ Only the following GitHub remote mutations are approved by this pack, and only a
 | Create pull request | Approved | `mcp_github_create_pull_request` only | PR template, PR Body Audit Gate `pass` or `repaired` for the complete candidate PR body, verified branch, real owner/repo/base/head/title/body |
 | Resolve or unresolve review thread via MCP | Approved | `mcp_github_pull_request_review_write` with method `resolve_thread` or `unresolve_thread` only | Real review thread node ID from extension/GitHub data; pushed-visible addressed state or verified no-change rationale; gatekeeper pass or allowed skip; no mutating probe |
 | Resolve review thread via VS Code PR extension | Approved | `github.vscode-pull-request-github/resolveReviewThread` only | Real review thread node ID from extension/GitHub data; pushed-visible addressed state or verified no-change rationale; gatekeeper pass or allowed skip; no mutating probe |
-| Reply/comment on PR review feedback | Approved | Exact reply/comment tool for the intended surface: `mcp_github_add_pull_request_review_comment_to_pending_review` for pending reviews, or `mcp_github_pull_request_review_write` with method `create` for new reviews. Do not use `mcp_github_add_issue_comment` for PR review feedback. | Pushed-visible changes or verified no-change rationale; real PR/comment/thread IDs; pending-review inline comments are staged only and are not posted evidence until submit-pending-review succeeds and visibility is confirmed; the verified no-change rationale must cite a specific spec, non-goal, file:line, or reviewer SHA (see Glossary) |
+| Reply/comment on PR review feedback | Approved | Exact reply/comment tool for the intended surface: `mcp_github_add_reply_to_pull_request_comment` with params `owner`, `repo`, `pullNumber`, `commentId: number`, and `body` for direct replies to existing PR review comments; `mcp_github_add_pull_request_review_comment_to_pending_review` for pending-review inline comments; or `mcp_github_pull_request_review_write` with method `create` for new reviews. Do not use `mcp_github_add_issue_comment` for PR review feedback. | Pushed-visible changes or verified no-change rationale; real PR/comment/thread IDs; direct existing-comment replies require the Direct Review Comment Reply ID Provenance Gate below; pending-review inline comments are staged only and are not posted evidence until submit-pending-review succeeds and visibility is confirmed; the verified no-change rationale must cite a specific spec, non-goal, file:line, or reviewer SHA (see Glossary) |
 | Submit pending pull request review | Approved | `mcp_github_pull_request_review_write` with method `submit_pending_pull_request_review` (or the host MCP server's documented submit-pending-review method); the submission `event` parameter is `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`. Do not substitute the issue-comment tool. | Pushed-visible changes; the review body and any inline pending comments must already satisfy the Externally-Posted Content Gate; real PR ID and pending-review ID; explicit operator approval when the submitted event is `APPROVE`; success must be confirmed before pending-review comments count as posted evidence |
 | Delete pending pull request review | Approved | The host MCP server's documented delete-pending-review method on `mcp_github_pull_request_review_write` (or equivalent) | Real PR ID and pending-review ID; used only to abandon a pending review whose composed content was rejected by gates or by the operator, or whose submission failed or cannot be confirmed |
 | Merge pull request | Blocked | None approved | Future workflow required |
@@ -184,6 +184,21 @@ Copilot PR creation is not a recovery path, fallback, or substitute for failed o
 If the exact approved GitHub tool or required real IDs are missing, unavailable, ambiguous, or fail before completing the intended action, stop and provide guidance instead of trying a substitute mutation.
 
 Pending-review lifecycle rule: staging pending-review inline comments is not a posted reviewer-facing reply and does not satisfy reply-before-resolve evidence. If pending-review content fails the Externally-Posted Content Gate, do not submit it; delete or abandon any pending review that already contains rejected content before any thread resolution. If submit-pending-review fails or its GitHub-visible result is unconfirmed, block resolution and report the failed or unconfirmed submission separately from reply creation; never classify that path as `reply+resolve`.
+
+### Direct Review Comment Reply ID Provenance Gate
+
+Direct replies to existing PR review comments use `mcp_github_add_reply_to_pull_request_comment` and require `commentId` to identify the exact review comment being answered. This `commentId` is distinct from the review thread node ID used for resolution.
+
+Allowed `commentId` provenance, in order:
+
+1. A direct numeric field from an approved fresh GitHub or VS Code PR extension read for the exact review comment, such as a tool-returned numeric `id`, `databaseId`, or documented review-comment reply ID.
+2. If no direct numeric field is available, a parsed value from the exact `#discussion_r<digits>` fragment in the `html_url` field returned by the same approved fresh read for the exact review comment.
+
+Fallback parsing is allowed only for an `html_url` value from the approved fresh read result for the exact review comment. Before using the fallback, record an operator-facing provenance summary naming the read source, freshness point, exact-comment match basis, unavailable direct numeric field, parsed fragment value, and disagreement check result. Do not include this provenance summary in reviewer-facing replies.
+
+Forbidden `commentId` sources include arbitrary pasted URLs, user-provided fragments, file paths, line numbers, stale cache, prior partial reads, search snippets, placeholders, guesses, dummy values, inferred values, and review thread node IDs such as `PRRT_...`.
+
+Fail closed and report the reply sub-action blocked when the fragment is missing, malformed, non-numeric, not an exact `#discussion_r<digits>` fragment, sourced from a stale or partial read, not tied to the exact review comment, conflicts with another candidate ID, or disagrees with a direct numeric field from the same fresh exact-comment read.
 
 ## Linear Remote Mutation Allowlist
 
@@ -433,6 +448,7 @@ Before replying to PR review comments as addressed or resolving threads:
 - Ensure the relevant fix is committed, pushed to the PR branch, and visible in the PR.
 - Local-only changes are not addressed PR comments.
 - Replies, review status mutations, and thread resolution require real PR/review critical parameters from GitHub data.
+- Direct existing-comment replies require a real numeric `commentId` from the Direct Review Comment Reply ID Provenance Gate. A thread node ID, arbitrary URL, user-provided fragment, file path, line number, stale or partial read, placeholder, or guess is not a valid `commentId`.
 - Thread resolution or unresolution requires the actual GitHub review thread node ID. A comment URL, file path, line number, review comment ID, inferred value, placeholder, or `dummy` value is not a valid substitute.
 - If the actual review thread node ID is unavailable, report resolution blocked instead of attempting `resolve_thread`/`unresolve_thread` or claiming resolution.
 - `github.vscode-pull-request-github/resolveReviewThread` is approved only for review-thread resolution with a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
