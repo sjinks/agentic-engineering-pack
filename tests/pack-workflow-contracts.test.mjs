@@ -79,6 +79,27 @@ function frontmatterValue(text, key) {
     return frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.trim();
 }
 
+function boundaryIndex(text, boundary, fromIndex = 0) {
+    const index = text.indexOf(boundary, fromIndex);
+
+    assert.notEqual(index, -1, `boundary is present: ${boundary}`);
+
+    return index;
+}
+
+function sliceBetween(text, startBoundary, endBoundary, fromIndex = 0) {
+    const start = boundaryIndex(text, startBoundary, fromIndex);
+    const end = boundaryIndex(text, endBoundary, start + startBoundary.length);
+
+    assert.ok(end > start, `${endBoundary} follows ${startBoundary}`);
+
+    return text.slice(start, end);
+}
+
+function sliceFrom(text, startBoundary, fromIndex = 0) {
+    return text.slice(boundaryIndex(text, startBoundary, fromIndex));
+}
+
 function pathWithin(root, relativePath) {
     return relativePath ? join(root, ...relativePath.split('/')) : root;
 }
@@ -619,6 +640,88 @@ test('workflow safety gates allow exact VS Code PR extension surfaces without br
     assert.match(text, /mcp_github_create_or_update_file/);
     assert.match(text, /mcp_github_push_files/);
     assert.match(text, /mcp_github_delete_file/);
+});
+
+test('workflow safety gates approve direct existing-comment replies with separate params and provenance', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const allowlistRow = text.split('\n').find((line) => line.includes('| Reply/comment on PR review feedback |')) ?? '';
+    const provenanceSection = sliceBetween(text, '### Direct Review Comment Reply ID Provenance Gate', '## Linear Remote Mutation Allowlist');
+
+    assert.match(allowlistRow, /mcp_github_add_reply_to_pull_request_comment/);
+    assert.match(allowlistRow, /`owner`/);
+    assert.match(allowlistRow, /`repo`/);
+    assert.match(allowlistRow, /`pullNumber`/);
+    assert.match(allowlistRow, /`commentId: number`/);
+    assert.match(allowlistRow, /`body`/);
+    assert.match(allowlistRow, /direct replies to existing PR review comments/);
+    assert.match(allowlistRow, /pending-review inline comments/);
+    assert.match(allowlistRow, /new reviews/);
+    assert.match(allowlistRow, /Direct Review Comment Reply ID Provenance Gate/);
+    assert.match(allowlistRow, /Do not use `mcp_github_add_issue_comment` for PR review feedback/);
+
+    assert.match(provenanceSection, /This `commentId` is distinct from the review thread node ID used for resolution/);
+    assert.match(provenanceSection, /A direct numeric field from an approved fresh GitHub or VS Code PR extension read for the exact review comment/);
+    assert.match(provenanceSection, /numeric `id`, `databaseId`, or documented review-comment reply ID/);
+    assert.match(provenanceSection, /exact `#discussion_r<digits>` fragment in the `html_url` field/);
+    assert.match(provenanceSection, /operator-facing provenance summary/);
+    assert.match(provenanceSection, /Do not include this provenance summary in reviewer-facing replies/);
+});
+
+test('direct review comment reply provenance forbids unsafe sources and fails closed', async () => {
+    const safety = await read(workflowSafetyGatesPath);
+    const context = await read(prReviewThreadContextPath);
+    const combined = `${safety}\n${context}`;
+    const provenanceSection = sliceBetween(safety, '### Direct Review Comment Reply ID Provenance Gate', '## Linear Remote Mutation Allowlist');
+
+    for (const unsafeSource of [
+        'arbitrary pasted URLs',
+        'user-provided fragments',
+        'file paths',
+        'line numbers',
+        'stale cache',
+        'prior partial reads',
+        'search snippets',
+        'placeholders',
+        'guesses',
+        'dummy values',
+        'review thread node IDs such as `PRRT_...`',
+    ]) {
+        assert.match(provenanceSection, new RegExp(unsafeSource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${unsafeSource} is forbidden`);
+    }
+
+    assert.match(combined, /Reject missing, malformed, non-numeric, stale, partial, search-snippet, non-exact-comment, conflicting, or thread-node values/);
+    assert.match(combined, /direct numeric field and the parsed `html_url` fallback are present, they must match; disagreement blocks the reply sub-action/);
+    assert.match(combined, /missing thread node ID, missing comment database ID or direct reply `commentId`, invalid `html_url` fragment, stale or partial snapshot, exact-comment mismatch, direct\/fallback disagreement/);
+    assert.match(safety, /A thread node ID, arbitrary URL, user-provided fragment, file path, line number, stale or partial read, placeholder, or guess is not a valid `commentId`/);
+});
+
+test('PR review thread context documents direct numeric commentId and narrow html_url fallback', async () => {
+    const text = await read(prReviewThreadContextPath);
+    const mapping = sliceBetween(text, '## ID Mapping', '## Output Contract');
+
+    assert.match(mapping, /Direct existing-comment reply `commentId`: numeric/);
+    assert.match(mapping, /Prefer a direct numeric field from an approved fresh GitHub or VS Code PR extension read for the exact review comment/);
+    assert.match(mapping, /tool-returned numeric `id`, `databaseId`, or documented review-comment reply ID/);
+    assert.match(mapping, /only fallback is parsing the exact `#discussion_r<digits>` fragment from that same exact comment's `html_url`/);
+    assert.match(mapping, /Do not parse arbitrary pasted URLs or user-provided fragments/);
+    assert.match(mapping, /It is not the thread node ID/);
+    assert.match(text, /Direct reply provenance:[\s\S]+read source, freshness point, exact-comment match basis, unavailable direct numeric field, parsed `html_url` fragment, and direct-vs-fallback disagreement check/);
+});
+
+test('PR review reply-resolve separates direct replies from pending and new review surfaces', async () => {
+    const replyResolve = await read(prReviewReplyResolvePath);
+    const coordinator = await read(prReviewSkillPath);
+    const combined = `${replyResolve}\n${coordinator}`;
+
+    assert.match(replyResolve, /## Reply Surface Selection/);
+    assert.match(replyResolve, /Direct existing-comment mode posts a reply to an existing PR review comment/);
+    assert.match(replyResolve, /mcp_github_add_reply_to_pull_request_comment/);
+    assert.match(replyResolve, /`owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`/);
+    assert.match(replyResolve, /Pending-review mode stages inline comments into a pending review and does not post evidence until submission succeeds and visibility is confirmed/);
+    assert.match(replyResolve, /New-review mode creates new review feedback through the approved review-write surface/);
+    assert.match(replyResolve, /do not use pending-review mode as evidence until the pending review is submitted and confirmed/);
+    assert.match(combined, /Direct existing-comment replies require a numeric `commentId` with provenance accepted by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate/);
+    assert.match(combined, /Pending-review inline comments and new review feedback remain separate surfaces and are not interchangeable with direct existing-comment replies/);
 });
 
 test('workflow safety PR readiness requires broad validation evidence for PR-review fix cycles', async () => {
