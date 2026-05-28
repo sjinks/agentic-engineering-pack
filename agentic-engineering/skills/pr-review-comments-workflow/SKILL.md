@@ -35,7 +35,7 @@ Before calling `resolve_thread`, `unresolve_thread`, or posting a reply, perform
 - Field mapping for the write tools:
    - `threadId` parameter on `mcp_github_pull_request_review_write` (`resolve_thread`/`unresolve_thread`) → the GraphQL node ID at `reviewThreads.nodes.id` (the `PRRT_...` string). It is NOT the numeric comment ID and NOT a REST URL.
    - Reply target for `mcp_github_add_pull_request_review_comment_to_pending_review` and `mcp_github_pull_request_review_write` with method `create` → the per-comment `databaseId` at `reviewThreads.nodes.comments.nodes.databaseId` (numeric REST ID). It is NOT the thread node ID.
-- If the approved read returns no threads, returns threads without IDs, or fails, treat thread/comment IDs as unavailable and follow the existing "If thread node IDs are unavailable" rule above instead of attempting any mutating call.
+- If the approved read returns no threads, returns threads without the required IDs, or fails, treat thread/comment IDs as unavailable; block only the affected reply or resolve sub-action; report the missing ID/blocker in the Workflow Output Format; and do not use mutating tools as probes.
 
 ## Workflow
 
