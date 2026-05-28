@@ -12,13 +12,15 @@ Specialist agents are isolated by role and tool permissions. Builder and Test ar
 
 Skills act as reusable procedures and quality gates, not broad permission grants. A skill can standardize steps like commit hygiene or PR comment handling, but it does not override each agent's tool boundaries.
 
-The workflow is gate-based: clarify readiness, gather context, run spec and architecture gates when triggered, implement, test, review, convert reviewer findings into a test-gap plan when a fix cycle follows, clean commits, push through delegated local git mechanics, confirm remote visibility, close review rounds through the gatekeeper, check the Pull Request Template, and create PRs through orchestrator-only `mcp_github_create_pull_request` when the PR path is active. No-PR paths still report thread-state evidence, such as `thread state: not applicable - no PR exists yet`, instead of pretending the PR surface was checked. Before any push or PR path involving commits, `commit-hygiene`, `conventional-commits`, and `commit-body-guidelines` are mandatory; unavailable commit skills block push/PR and produce local-status or PR-ready output instead.
+The workflow is gate-based: clarify readiness, gather context, run spec and architecture gates when triggered, implement, test, review, convert reviewer findings into a test-gap plan when a fix cycle follows, clean commits, push through delegated local git mechanics, confirm remote visibility, close review rounds through the gatekeeper, check the Pull Request Template, audit the complete selected-template/fallback PR body, and create PRs through orchestrator-only `mcp_github_create_pull_request` when the PR path is active. No-PR paths still report thread-state evidence, such as `thread state: not applicable - no PR exists yet`, instead of pretending the PR surface was checked. Before any push or PR path involving commits, `commit-hygiene`, `conventional-commits`, and `commit-body-guidelines` are mandatory; unavailable commit skills block push/PR and produce local-status or PR-ready output instead.
 
 High-risk agent-pack changes touching orchestrator workflow rules, tool grants, security boundaries, security-tester authorization, or multiple agent files require contextual plus independent review, or an explicit skip rationale/deference recorded before commit hygiene and PR readiness.
 
 The final report carries a first-class `Readiness decision: blocked | partial | ready | not ready`. `ready` requires complete specialist outputs, verification/check evidence, review/arbitration evidence, gatekeeper evidence or the explicit `no fix cycle, gatekeeper skipped` sentinel, thread-state freshness or no-PR proof, PR/template evidence when applicable, and explicit not-applicable rationales for skipped gates.
 
 PR description generation is intentionally final and on-demand. It is produced when changes are stable, not at the start of implementation.
+
+The user-facing composer remains `pull-request-description`. It invokes internal support skills `pr-description-template-policy` and `pr-description-body-audit` for template policy and final body audit; those support skills are marked `user-invocable: false` and should not be selected directly by users.
 
 ```mermaid
 flowchart TD
@@ -41,9 +43,10 @@ flowchart TD
     I -->|"no"| N["no fix cycle, gatekeeper skipped"]
     N --> M
     M --> O{"PR path?"}
-    O -->|"yes"| P["Template check and PR creation"]
+    O -->|"yes"| P["Template check and PR Body Audit Gate"]
     O -->|"no"| Q["No-PR thread-state evidence"]
-    P --> R["Final report with Readiness decision"]
+    P --> PA["Create PR with audited selected-template/fallback body"]
+    PA --> R["Final report with Readiness decision"]
     Q --> R
 ```
 
@@ -215,7 +218,8 @@ graph TD
     O --> P{"Gatekeeper pass?"}
     P -->|No| V["Report gatekeeper blocker"]
     P -->|Yes| T["Check PR Template"]
-    T --> U["Create GitHub PR<br/>mcp_github_create_pull_request"]
+    T --> TA["PR Body Audit Gate<br/>pass/repaired complete body"]
+    TA --> U["Create GitHub PR<br/>with audited selected-template/fallback body<br/>mcp_github_create_pull_request"]
     U --> Z["Final report<br/>Readiness decision"]
     V --> Z
 ```
@@ -302,14 +306,15 @@ graph TD
     J --> K["User Approval if Rewriting"]
     K --> L["Shared-module durable record<br/>and verified-internals evidence if needed"]
     L --> M["Push to Branch<br/>delegated local git mechanics"]
-    M --> N["Check Pull Request Template<br/>Use template or fallback explicitly"]
+    M --> N["Check Pull Request Template<br/>Use selected template or fallback explicitly"]
     N --> O{Ready for PR Description?}
-    O -->|Later/On-demand| P["Use Template/Fallback Body<br/>no generated description"]
+    O -->|Later/On-demand| P["Use selected template/fallback body<br/>no generated description"]
     O -->|Now| Q["Pull Request Description Skill"]
     Q --> R["Generate from Commits,<br/>Review Context,<br/>and Template Status"]
-    R --> S["Create GitHub PR<br/>orchestrator-only<br/>mcp_github_create_pull_request"]
+    R --> S["PR Body Audit Gate<br/>pass/repaired complete body"]
     P --> S
-    S --> T["Final report<br/>Readiness decision"]
+    S --> T["Create GitHub PR<br/>with audited selected-template/fallback body<br/>orchestrator-only<br/>mcp_github_create_pull_request"]
+    T --> U["Final report<br/>Readiness decision"]
 ```
 
 ## Tool and Permission Model
@@ -703,7 +708,7 @@ Prevents: Fixing wrong issues, wasting effort on ambiguous or misscoped work, si
 
 **GitHub PR Creation -> Template Checked and Honored**
 
-The detailed checklist lives in [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR, the workflow checks standard template locations, uses a single clear template, asks the user when multiple templates are ambiguous, or falls back explicitly when no template is found/readable.
+The detailed checklist lives in [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR or publishing a PR-ready body, the workflow checks standard template locations, uses a single readable template even if other candidates are unreadable, asks the user when multiple readable templates are ambiguous, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask-or-block when a chosen template is unreadable but readable alternatives exist, or falls back explicitly when no template is found or no readable candidates exist.
 
 The workflow composes the PR body explicitly from the selected template or fallback. It does not assume GitHub MCP/API PR creation tools will auto-apply repository templates, and it includes PR template status in final reporting whenever PR creation happens.
 
@@ -844,8 +849,10 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 5. After implementation, verification, review, test-gap planning when needed, and commit hygiene pass, pushes to the branch via delegated local git mechanics and confirms the pushed commits are visible on the remote.
 6. Runs `review-cycle-gatekeeper` after remote visibility confirmation and before PR creation, passing `thread state: not applicable - no PR exists yet` with proof when no PR exists yet.
 7. Checks durable-record requirements such as shared-module prompt output and verified-internals evidence when they apply.
-8. Creates GitHub PR with `mcp_github_create_pull_request`, the Linear issue link, selected template or fallback body, and any required reviewer-facing durable records.
-9. Linear issue remains open (no automatic status updates) unless user explicitly approves.
+8. Checks the target repository for PR templates, uses a single readable template even if other candidates are unreadable, asks when multiple readable templates are unresolved and ambiguous, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask/block when a chosen template is unreadable but readable alternatives exist, and then selects the template or fallback body.
+9. Applies the PR Body Audit Gate to the complete selected-template/fallback candidate body and proceeds only with `pass` or `repaired` status.
+10. Creates GitHub PR with `mcp_github_create_pull_request`, the Linear issue link, the audited selected-template/fallback body, and any required reviewer-facing durable records.
+11. Linear issue remains open (no automatic status updates) unless user explicitly approves.
 
 ### Addressing PR Review Comments
 

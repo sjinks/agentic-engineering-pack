@@ -5,7 +5,8 @@ import test from 'node:test';
 
 const linearSkillPath = '.github/skills/linear-issue-workflow/SKILL.md';
 const linearPromptPath = '.github/prompts/run-linear-issue-workflow.prompt.md';
-const docsPath = 'docs/agentic/README.md';
+const docsPath = 'agentic-engineering/docs/README.md';
+const rootReadmePath = 'README.md';
 const prReviewSkillPath = '.github/skills/pr-review-comments-workflow/SKILL.md';
 const testGapSkillPath = '.github/skills/test-gap-to-test-plan/SKILL.md';
 const workflowSafetyGatesPath = '.github/skills/workflow-safety-gates/SKILL.md';
@@ -13,12 +14,24 @@ const orchestratorPath = '.github/agents/agentic-engineering-orchestrator.agent.
 const runAgenticPromptPath = '.github/prompts/run-agentic-engineering.prompt.md';
 const expertPanelPath = '.github/skills/expert-panel/SKILL.md';
 const pullRequestDescriptionPath = '.github/skills/pull-request-description/SKILL.md';
+const prDescriptionTemplatePolicyPath = '.github/skills/pr-description-template-policy/SKILL.md';
+const prDescriptionBodyAuditPath = '.github/skills/pr-description-body-audit/SKILL.md';
 const adversarialReviewPath = '.github/skills/adversarial-review/SKILL.md';
 const adversaryAgentPath = '.github/agents/adversary-agent.agent.md';
 const independentReviewerPath = '.github/agents/independent-code-reviewer-agent.agent.md';
 const reviewCycleGatekeeperPath = '.github/skills/review-cycle-gatekeeper/SKILL.md';
 const testAgentPath = '.github/agents/test-agent.agent.md';
 const builderAgentPath = '.github/agents/builder-agent.agent.md';
+
+const prTemplateStatuses = [
+    'exactly-one-template-used',
+    'multiple-templates-user-selection-required',
+    'multiple-templates-selected-by-convention',
+    'blocked-on-template-choice',
+    'selected-template-unreadable-choice-required',
+    'no-template-fallback-used',
+    'unreadable-template-fallback-used',
+];
 
 async function read(path) {
     return readFile(path, 'utf8');
@@ -44,8 +57,19 @@ async function existingPaths(paths) {
     return resolved;
 }
 
+function frontmatterValue(text, key) {
+    const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? '';
+    return frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.trim();
+}
+
 function pathWithin(root, relativePath) {
     return relativePath ? join(root, ...relativePath.split('/')) : root;
+}
+
+function assertPrTemplateStatuses(text, label) {
+    for (const status of prTemplateStatuses) {
+        assert.match(text, new RegExp('`' + status + '`'), `${status} is included in ${label}`);
+    }
 }
 
 async function collectTree(root, relativePath = '') {
@@ -500,11 +524,22 @@ test('workflow safety gates deny Copilot PR creation as fallback or substitute',
 
     assert.match(text, /PR creation permits only the exact approved PR creation tool for this pack: `mcp_github_create_pull_request`/);
     assert.match(text, /Create pull request \| Approved \| `mcp_github_create_pull_request` only/);
+    assert.match(text, /Create pull request \| Approved \| `mcp_github_create_pull_request` only \| [^\n|]*PR Body Audit Gate `pass` or `repaired` for the complete candidate PR body/);
     assert.match(text, /Never use `mcp_github_create_pull_request_with_copilot` for PR creation in this pack/);
     assert.match(text, /Copilot PR creation \| Blocked \| `mcp_github_create_pull_request_with_copilot` is denied/);
     assert.match(text, /Host\/tool availability, generic tool descriptions, visible tool schemas, or tool names that appear capable never override this pack allowlist/);
     assert.match(text, /If local push mechanics, branch publication, or exact PR creation is blocked, unavailable, or fails[\s\S]+stop with a blocked, local-ready, or PR-ready summary\/guidance/);
     assert.match(text, /^Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling\.$/m);
+});
+
+test('workflow safety create-PR allowlist row requires audited PR body', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const row = text.split('\n').find((line) => line.startsWith('| Create pull request |')) ?? '';
+
+    assert.match(row, /`mcp_github_create_pull_request` only/);
+    assert.match(row, /PR Body Audit Gate/);
+    assert.match(row, /`pass` or `repaired`/);
+    assert.match(row, /complete candidate PR body/);
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
@@ -592,8 +627,304 @@ test('independent secondary lens matrix is explicit and prior-gated', async () =
     }
 });
 
+test('PR description support skills are internal and composer invokes them in order', async () => {
+    const [composer, templatePolicy, bodyAudit] = await Promise.all([
+        read(pullRequestDescriptionPath),
+        read(prDescriptionTemplatePolicyPath),
+        read(prDescriptionBodyAuditPath),
+    ]);
+
+    assert.equal(frontmatterValue(composer, 'user-invocable'), 'true', 'main composer remains user-invocable');
+    assert.equal(frontmatterValue(templatePolicy, 'user-invocable'), 'false', 'template policy is internal');
+    assert.equal(frontmatterValue(bodyAudit, 'user-invocable'), 'false', 'body audit is internal');
+    assert.equal(frontmatterValue(templatePolicy, 'name'), 'pr-description-template-policy');
+    assert.equal(frontmatterValue(bodyAudit, 'name'), 'pr-description-body-audit');
+
+    const templateInvocation = composer.indexOf('Before candidate composition, invoke `pr-description-template-policy`');
+    const composition = composer.indexOf('Generate the candidate copy/pasteable Markdown body');
+    const auditInvocation = composer.indexOf('Before final fenced Markdown emission, invoke `pr-description-body-audit`');
+
+    assert.ok(templateInvocation >= 0, 'composer invokes template policy before composition');
+    assert.ok(composition > templateInvocation, 'candidate composition follows template policy');
+    assert.ok(auditInvocation > composition, 'body audit follows candidate composition');
+    assert.match(composer, /Do not ask users to choose internal support skills/);
+    assert.match(composer, /If either support skill is unavailable or reports blocked, return blocked status and operator-facing notes instead of emitting a final fenced PR body/);
+});
+
+test('PR description composer blocks remote updates and keeps title generation conventional', async () => {
+    const composer = await read(pullRequestDescriptionPath);
+
+    assert.match(composer, /Generate copy\/pasteable Markdown only; do not edit existing PR descriptions/);
+    assert.match(composer, /remote PR title\/body updates are not currently approved by `workflow-safety-gates`/);
+    assert.match(composer, /Do not call GitHub MCP mutation tools for PR body updates/);
+    assert.match(composer, /Update status must say copy\/paste only/);
+    assert.match(composer, /PR title \(drafted by `conventional-commits` in Conventional Commit subject style\)/);
+    assert.match(composer, /The PR title is generated by `conventional-commits` and must be a single Conventional Commit subject line/);
+    assert.match(composer, /If `conventional-commits` is unavailable when a PR title is requested, report blocked/);
+});
+
+test('PR description template policy owns template discovery and operator-facing status', async () => {
+    const text = await read(prDescriptionTemplatePolicyPath);
+
+    assert.match(text, /aligns with the `workflow-safety-gates` PR Template Gate/);
+    assert.match(text, /\.github\/pull_request_template\.md/);
+    assert.match(text, /\.github\/PULL_REQUEST_TEMPLATE\/\*\.md/);
+    assert.match(text, /If exactly one readable template is found/);
+    assert.match(text, /Ambiguity is based on readable templates, not total candidate count/);
+    assert.match(text, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
+    assert.match(text, /If multiple readable templates are found and no repository convention clearly selects one/);
+    assert.match(text, /Return `blocked-on-template-choice`/);
+    assert.match(text, /list each readable candidate template path, include unreadable candidates as status evidence/);
+    assert.match(text, /If no template is found, return the fallback Markdown Template below with operator-facing status `no-template-fallback-used`/);
+    assert.match(text, /If exactly one candidate exists and is unreadable, or every candidate is unreadable, return the fallback Markdown Template below with operator-facing status `unreadable-template-fallback-used`/);
+    assert.match(text, /Template status is for the operator-facing notes outside the fenced PR body only/);
+    assert.match(text, /status as one of:[^\n]+blocked-on-template-choice/);
+    assertPrTemplateStatuses(text, 'PR description template policy status output');
+    assert.match(text, /no-template-fallback-used/);
+    assert.match(text, /unreadable-template-fallback-used/);
+    assert.match(text, /The reviewer-facing PR body must not include any sentence that names the template's existence, absence, source, or fallback selection/);
+});
+
+test('Linear workflow reports canonical PR template status vocabulary', async () => {
+    const text = await read(linearSkillPath);
+    const output = text.slice(
+        text.indexOf('## Output Format'),
+        text.indexOf('## Linear Comment Audience and Content'),
+    );
+
+    assert.match(output, /\*\*PR template status:\*\* One of/);
+    assertPrTemplateStatuses(output, 'Linear PR template status output');
+});
+
+test('orchestrator Output Format reports canonical PR template status vocabulary', async () => {
+    const text = await read(orchestratorPath);
+    const output = text.slice(text.indexOf('## Output Format'));
+
+    assert.match(output, /PR template status when PR creation happens: one of/);
+    assertPrTemplateStatuses(output, 'orchestrator PR template status output');
+});
+
+test('workflow safety PR Template Gate reports canonical PR template status vocabulary', async () => {
+    const text = await read(workflowSafetyGatesPath);
+    const templateGate = text.slice(
+        text.indexOf('## PR Template Gate'),
+        text.indexOf('### PR Body Audience'),
+    );
+
+    assert.match(templateGate, /Operator-facing template status must be one of/);
+    assertPrTemplateStatuses(templateGate, 'workflow safety PR Template Gate');
+});
+
+test('orchestrator PR creation guidance blocks ambiguous template choice when it cannot ask', async () => {
+    const text = await read(orchestratorPath);
+    const guidanceStart = text.indexOf('\n## PR Creation Guidance\n');
+    const section = text.slice(
+        guidanceStart,
+        text.indexOf('\n## Output Format\n', guidanceStart),
+    );
+
+    assert.match(section, /blocked-on-template-choice/);
+});
+
+test('selected unreadable template blocks when readable alternatives exist', async () => {
+    const templatePolicy = await read(prDescriptionTemplatePolicyPath);
+    const workflowSafety = await read(workflowSafetyGatesPath);
+    const rootReadme = await read(rootReadmePath);
+    const guideReadme = await read(docsPath);
+    const templateGate = workflowSafety.slice(
+        workflowSafety.indexOf('## PR Template Gate'),
+        workflowSafety.indexOf('### PR Body Audience'),
+    );
+    const rootLinear = rootReadme.slice(
+        rootReadme.indexOf('## Linear Issue Workflow'),
+        rootReadme.indexOf('### Invalid Triage Gate'),
+    );
+    const guideTemplateGate = guideReadme.slice(
+        guideReadme.indexOf('### Pull Request Template Gate'),
+        guideReadme.indexOf('### External Project Scope Gate'),
+    );
+
+    assert.match(templatePolicy, /selected-template-unreadable-choice-required/);
+    assert.match(templatePolicy, /Ambiguity is based on readable templates, not total candidate count/);
+    assert.match(templatePolicy, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
+    assert.match(templatePolicy, /If multiple readable templates are found and no repository convention clearly selects one/);
+    assert.match(templatePolicy, /best-guess readable template/);
+    assert.match(templatePolicy, /user-selected or repository-convention-selected template is unreadable and at least one other candidate template is readable/);
+    assert.match(templatePolicy, /Do not silently use the fallback template and do not silently switch to a readable alternative/);
+    assert.match(templatePolicy, /If no template is found, return the fallback Markdown Template below with operator-facing status `no-template-fallback-used`/);
+    assert.match(templatePolicy, /If exactly one candidate exists and is unreadable, or every candidate is unreadable, return the fallback Markdown Template below with operator-facing status `unreadable-template-fallback-used`/);
+
+    assert.match(templateGate, /selected-template-unreadable-choice-required/);
+    assert.match(templateGate, /blocked-on-template-choice/);
+    assert.match(templateGate, /Ambiguity is based on readable templates, not total candidate count/);
+    assert.match(templateGate, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
+    assert.match(templateGate, /If multiple readable templates are found and repository convention does not clearly select one, ask the user before PR creation or PR-ready body publication/);
+    assert.match(templateGate, /ask the user to choose a readable template or confirm fallback use/);
+    assert.match(templateGate, /If the workflow cannot ask, block/);
+    assert.match(templateGate, /If no template is found, use the workflow fallback body and state operator-facing template status `no-template-fallback-used`/);
+    assert.match(templateGate, /If exactly one candidate exists and is unreadable, or every candidate is unreadable, use the workflow fallback body and state operator-facing template status `unreadable-template-fallback-used`/);
+    assert.doesNotMatch(templateGate, /selected template cannot be read, use the workflow fallback body/i);
+
+    assert.match(rootLinear, /uses a single readable template as the PR body structure even if other candidates are unreadable/);
+    assert.match(rootLinear, /multiple readable templates require a user choice/);
+    assert.match(rootLinear, /blocked-on-template-choice/);
+    assert.match(rootLinear, /selected-template-unreadable-choice-required/);
+    assert.match(rootLinear, /ask-or-block when a chosen template is unreadable but readable alternatives exist/);
+    assert.match(guideTemplateGate, /uses a single readable template even if other candidates are unreadable/);
+    assert.match(guideTemplateGate, /multiple readable templates are ambiguous/);
+    assert.match(guideTemplateGate, /blocked-on-template-choice/);
+    assert.match(guideTemplateGate, /selected-template-unreadable-choice-required/);
+    assert.match(guideTemplateGate, /ask-or-block when a chosen template is unreadable but readable alternatives exist/);
+});
+
+test('workflow safety PR Body Audit Gate is canonical for all PR body paths', async () => {
+    const workflowSafety = await read(workflowSafetyGatesPath);
+    const orchestrator = await read(orchestratorPath);
+    const linear = await read(linearSkillPath);
+    const prReview = await read(prReviewSkillPath);
+    const composer = await read(pullRequestDescriptionPath);
+    const auditGate = workflowSafety.slice(
+        workflowSafety.indexOf('### PR Body Audit Gate'),
+        workflowSafety.indexOf('## PR Readiness Evidence Gate'),
+    );
+    const prReviewIntegrationStart = prReview.indexOf('## Integration with Pull Request Description');
+    const prReviewIntegration = prReview.slice(
+        prReviewIntegrationStart,
+        prReview.indexOf('\n## Output Format', prReviewIntegrationStart),
+    );
+
+    assert.match(auditGate, /Before a workflow sends a body to `mcp_github_create_pull_request`/);
+    assert.match(auditGate, /publishes a PR-ready body for manual creation/);
+    assert.match(auditGate, /returns a final fenced copy\/paste PR description/);
+    assert.match(auditGate, /orchestrator's inline PR creation/);
+    assert.match(auditGate, /direct `linear-issue-workflow` PR creation/);
+    assert.match(auditGate, /`pull-request-description`/);
+    assert.match(auditGate, /workflow\/template leakage/);
+    assert.match(auditGate, /Hard-wrapped paragraphs or list items/);
+    assert.match(auditGate, /Validation language is honest/);
+    assert.match(auditGate, /Synthesis adversarial-review PR-body lines/);
+    assert.match(auditGate, /The final output separates the reviewer-facing body from operator-facing notes/);
+    assert.match(auditGate, /blocks `mcp_github_create_pull_request` and blocks PR-ready body publication/);
+
+    assert.match(orchestrator, /apply the `workflow-safety-gates` PR Body Audit Gate to the complete candidate body/);
+    assert.match(orchestrator, /do not create the PR and do not publish the PR-ready body until the body is repaired and re-audited/);
+    assert.match(linear, /apply the `workflow-safety-gates` PR Body Audit Gate to the complete candidate body/);
+    assert.match(linear, /before calling `mcp_github_create_pull_request` or publishing any PR-ready body/);
+    assert.match(prReviewIntegration, /explicit PR description update requests and final PR-body refreshes as PR-body composition\/publication paths/);
+    assert.match(prReviewIntegration, /Route through `pull-request-description` when available; otherwise apply the complete `workflow-safety-gates` PR Body Audit Gate checklist/);
+    assert.match(prReviewIntegration, /before returning any final fenced copy\/paste PR body or PR-ready body/);
+    assert.match(prReviewIntegration, /Proceed only when the PR Body Audit Gate status is `pass` or `repaired`/);
+    assert.match(prReviewIntegration, /If the audit is `blocked`, unavailable, ambiguous, or missing, do not emit a final fenced PR body or PR-ready body/);
+    assert.match(prReviewIntegration, /remote PR title\/body updates stay blocked by `workflow-safety-gates`/);
+    assert.match(composer, /canonical `workflow-safety-gates` PR Body Audit Gate/);
+});
+
+test('operator-facing docs require PR Body Audit Gate before PR creation', async () => {
+    const rootReadme = await read(rootReadmePath);
+    const guideReadme = await read(docsPath);
+    const rootLinear = rootReadme.slice(
+        rootReadme.indexOf('## Linear Issue Workflow'),
+        rootReadme.indexOf('### Invalid Triage Gate'),
+    );
+    const guideLinear = guideReadme.slice(
+        guideReadme.indexOf('### Linear Issue Workflow Flowchart'),
+        guideReadme.indexOf('### PR Review Comments Workflow Flowchart'),
+    );
+
+    for (const [path, text] of [
+        [rootReadmePath, rootLinear],
+        [docsPath, guideLinear],
+    ]) {
+        const templateCheck = text.search(/Checks? (?:the target repository for a )?Pull Request Template|Check PR Template/);
+        const auditGate = text.indexOf('PR Body Audit Gate');
+        const prCreation = text.indexOf('mcp_github_create_pull_request');
+
+        assert.ok(templateCheck >= 0, `${path} checks PR template before PR creation`);
+        assert.ok(auditGate > templateCheck, `${path} audits the selected-template/fallback body after template selection`);
+        assert.ok(prCreation > auditGate, `${path} creates PR only after PR Body Audit Gate`);
+        assert.match(text, /complete selected-template\/fallback candidate body|pass\/repaired complete body/, `${path} audits the complete candidate body`);
+        assert.match(text, /`pass` or `repaired` status|pass\/repaired complete body/, `${path} requires pass or repaired audit status`);
+        assert.match(text, /audited selected-template\/fallback body/, `${path} creates the PR with the audited body`);
+        assert.doesNotMatch(text, /mcp_github_create_pull_request[^\n]+template status/i, `${path} keeps template status out of PR creation`);
+    }
+
+    assert.match(rootLinear, /operator-facing PR template status/);
+});
+
+test('Linear Issue to PR docs summary checks template choice before PR Body Audit Gate', async () => {
+    const guideReadme = await read(docsPath);
+    const section = guideReadme.slice(
+        guideReadme.indexOf('### Linear Issue to PR'),
+        guideReadme.indexOf('### Addressing PR Review Comments'),
+    );
+
+    const templateCheck = section.indexOf('8. Checks the target repository for PR templates');
+    const auditGate = section.indexOf('9. Applies the PR Body Audit Gate');
+    const prCreation = section.indexOf('10. Creates GitHub PR with `mcp_github_create_pull_request`');
+
+    assert.ok(templateCheck >= 0, 'Linear Issue to PR summary checks PR templates');
+    assert.ok(auditGate > templateCheck, 'PR Body Audit Gate follows template choice in the summary');
+    assert.ok(prCreation > auditGate, 'PR creation follows PR Body Audit Gate in the summary');
+    assert.match(section, /uses a single readable template even if other candidates are unreadable/);
+    assert.match(section, /asks when multiple readable templates are unresolved and ambiguous/);
+    assert.match(section, /blocked-on-template-choice/);
+    assert.match(section, /selected-template-unreadable-choice-required/);
+    assert.match(section, /ask\/block when a chosen template is unreadable but readable alternatives exist/);
+    assert.match(section, /complete selected-template\/fallback candidate body/);
+});
+
+test('Verified non-changes citation rules are inherited by direct PR body paths', async () => {
+    const workflowSafety = await read(workflowSafetyGatesPath);
+    const orchestrator = await read(orchestratorPath);
+    const linear = await read(linearSkillPath);
+    const auditGate = workflowSafety.slice(
+        workflowSafety.indexOf('### PR Body Audit Gate'),
+        workflowSafety.indexOf('## PR Readiness Evidence Gate'),
+    );
+
+    assert.match(auditGate, /`## Verified non-changes` items cite all required evidence/);
+    assert.match(auditGate, /in-repo code path/);
+    assert.match(auditGate, /one-sentence statement of the upstream contract or library behavior/);
+    assert.match(auditGate, /in-repository machine-readable version-pin location/);
+    assert.match(auditGate, /must not cite URLs, off-repo paths, dependency-tree internal source paths/);
+    assert.match(auditGate, /Drop the entire invalid item and report the offending citation excerpt to the operator/);
+
+    assert.match(orchestrator, /only when each item satisfies the canonical `workflow-safety-gates` PR Body Audit Gate citation validation/);
+    assert.match(linear, /`## Verified non-changes` citation validation/);
+});
+
+test('PR description support skills hard-stop on direct invocation', async () => {
+    for (const path of [prDescriptionTemplatePolicyPath, prDescriptionBodyAuditPath]) {
+        const text = await read(path);
+        const section = text.slice(
+            text.indexOf('## Direct Invocation Hard Stop'),
+            text.indexOf('## Responsibility'),
+        );
+
+        assert.equal(frontmatterValue(text, 'user-invocable'), 'false', `${path} remains internal`);
+        assert.match(section, /blocked-direct-invocation/, `${path} has a direct-invocation blocker`);
+        assert.match(section, /Route final copy\/paste PR descriptions to `pull-request-description`/, `${path} routes final descriptions`);
+        assert.match(section, /route PR creation workflows to the orchestrator or `linear-issue-workflow`/, `${path} routes creation workflows`);
+        assert.match(section, /This hard stop does not apply when `pull-request-description`, the orchestrator, or a workflow skill invokes this skill internally/, `${path} allows internal workflow use`);
+    }
+});
+
+test('PR body audit section blocks support-skill leakage and partial Verified non-changes', async () => {
+    const workflowSafety = await read(workflowSafetyGatesPath);
+    const auditGate = workflowSafety.slice(
+        workflowSafety.indexOf('### PR Body Audit Gate'),
+        workflowSafety.indexOf('## PR Readiness Evidence Gate'),
+    );
+
+    assert.match(auditGate, /support-skill/);
+    assert.match(auditGate, /unresolved workflow\/template leakage blocks/);
+    assert.match(auditGate, /failed citation validation that leaves an incomplete `## Verified non-changes` item/);
+    assert.match(auditGate, /do not ship a partial item/);
+    assert.doesNotMatch(auditGate, /direct workflow paths .* do not need to repeat the full rule/i);
+});
+
 test('synthesis PR body line is emitted only after completed adversarial review', async () => {
-    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, runAgenticPromptPath, pullRequestDescriptionPath, docsPath]);
+    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, runAgenticPromptPath, prDescriptionBodyAuditPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one synthesis path exists');
 
     for (const path of paths) {
@@ -601,18 +932,23 @@ test('synthesis PR body line is emitted only after completed adversarial review'
         assert.match(text, /trivial synthesis skips? with rationale/i, `${path} preserves trivial synthesis skip rationale`);
     }
 
-    const prDescription = await read(pullRequestDescriptionPath);
+    const prDescription = await read(prDescriptionBodyAuditPath);
     assert.match(prDescription, /only when the synthesis pre-push review actually ran to completion/);
-    assert.match(prDescription, /must be removed if it appears in a non-synthesis PR or in a trivial synthesis skip/);
-    assert.match(prDescription, /Pre-push adversarial review status report .* is operator-facing only and MUST never appear inside the fenced PR body/s);
+    assert.match(prDescription, /Remove the adversarial-review line if it appears in a non-synthesis PR, in a trivial synthesis skip, or after `Verdict: BLOCK`/);
+    assert.match(prDescription, /Pre-push adversarial review status report, including .* is operator-facing only and MUST never appear inside the fenced PR body/s);
 });
 
-test('pull request description guards against hard-wrapped PR bodies', async () => {
-    const prDescription = await read(pullRequestDescriptionPath);
+test('PR description body audit guards against hard-wrapped PR bodies and leakage', async () => {
+    const prDescription = await read(prDescriptionBodyAuditPath);
 
     assert.match(prDescription, /candidate PR body[\s\S]+Before returning or emitting the fenced Markdown body|Before returning or emitting the fenced Markdown body[\s\S]+candidate PR body/);
     assert.match(prDescription, /hard-wrapped paragraphs? or list items?|hard-wrapped paragraphs?[\s\S]+list items?/);
     assert.match(prDescription, /Repair[\s\S]+before emitting/);
     assert.match(prDescription, /cannot confidently distinguish intentional Markdown structure[\s\S]+accidental hard wrapping[\s\S]+block and fail fast/);
     assert.match(prDescription, /~72-character body wrap from `commit-body-guidelines` and `conventional-commits` applies to commit bodies only[\s\S]+do not carry their wrap width into the PR body/);
+    assert.match(prDescription, /must not name workflow specialists, MCP tools, handoff steps, skills, host plumbing, or internal readiness diagnostics/);
+    assert.match(prDescription, /Verify validation language is honest, reviewer-facing, and free of workflow-specialist narration/);
+    assert.match(prDescription, /Template status, validation source, omissions\/warnings, and update status remain in operator-facing notes outside the fenced PR body/);
+    assert.match(prDescription, /Each item MUST cite all of the following/);
+    assert.match(prDescription, /drop the entire item from the section, list the dropped item in operator-facing notes with the offending citation excerpt/);
 });

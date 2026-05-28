@@ -51,6 +51,8 @@ By default, output is written to `dist/agentic-engineering-pack`. Prompt files i
 
 The `pull-request-description` skill generates final, copy/pasteable Markdown from current branch commits, commit bodies, validation/review context, and any selected repository Pull Request Template after review/fix cycles are complete, or when explicitly requested. It is on-demand (not automatic for every PR create/update) and is copy/paste-only for existing PR descriptions; remote PR title/body updates are blocked unless a future exact PR-body-update workflow is added.
 
+It invokes two internal support skills, `pr-description-template-policy` and `pr-description-body-audit`, for template selection/fallback and final body audit. They are marked `user-invocable: false` and are not primary user entry points.
+
 ## Tool Permissions
 
 The pack uses minimal permissions per role.
@@ -117,9 +119,10 @@ The `Run Linear Issue Workflow` prompt integrates Linear issues with GitHub pull
 5. After verification and arbitration, invokes the `commit-hygiene` skill to clean and prepare commit history for PR, including invoking `conventional-commits` for subjects and `commit-body-guidelines` for structured bodies. If any required commit skill is unavailable or blocked, the workflow stops with a local-status or PR-ready summary instead of creating a PR.
 6. Prepares GitHub PR titles using Conventional Commit subject style (e.g., `fix(bounds): harden serialized bounds checks`), validated with the `conventional-commits` skill. Issue links go in the PR body unless repository convention requires title issue keys.
 7. Pushes to the branch via delegated local git mechanics after readiness evidence is present.
-8. Checks the target repository for a Pull Request Template in standard GitHub locations, uses a single discovered template as the PR body structure, asks with `vscode/askQuestions` when multiple templates require a user choice, or falls back to the pack-generated PR body when no template is found or readable.
-9. Creates a GitHub pull request with `mcp_github_create_pull_request`, issue context, validation, review notes, risks, and explicit PR template status only when reviewer conflicts are resolved or explicitly accepted.
-10. Reports the outcome, manual workspace-preparation status when applicable, and proposes Linear status/comment updates.
+8. Checks the target repository for a Pull Request Template in standard GitHub locations, uses a single readable template as the PR body structure even if other candidates are unreadable, asks with `vscode/askQuestions` when multiple readable templates require a user choice, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask-or-block when a chosen template is unreadable but readable alternatives exist, or falls back to the pack-generated PR body when no template is found or no readable candidates exist.
+9. Applies the PR Body Audit Gate to the complete selected-template/fallback candidate body and proceeds only with `pass` or `repaired` status.
+10. Creates a GitHub pull request with `mcp_github_create_pull_request`, issue context, validation, review notes, risks, and the audited selected-template/fallback body only when reviewer conflicts are resolved or explicitly accepted.
+11. Reports the outcome, operator-facing PR template status, manual workspace-preparation status, workspace scope cleanup status when applicable, and proposes Linear status/comment updates.
 
 It can use `pull-request-description` on request to generate a final copy/pasteable PR body after review/fix cycles are complete.
 
