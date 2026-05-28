@@ -79,27 +79,6 @@ function frontmatterValue(text, key) {
     return frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.trim();
 }
 
-function boundaryIndex(text, boundary, fromIndex = 0) {
-    const index = text.indexOf(boundary, fromIndex);
-
-    assert.notEqual(index, -1, `boundary is present: ${boundary}`);
-
-    return index;
-}
-
-function sliceBetween(text, startBoundary, endBoundary, fromIndex = 0) {
-    const start = boundaryIndex(text, startBoundary, fromIndex);
-    const end = boundaryIndex(text, endBoundary, start + startBoundary.length);
-
-    assert.ok(end > start, `${endBoundary} follows ${startBoundary}`);
-
-    return text.slice(start, end);
-}
-
-function sliceFrom(text, startBoundary, fromIndex = 0) {
-    return text.slice(boundaryIndex(text, startBoundary, fromIndex));
-}
-
 function pathWithin(root, relativePath) {
     return relativePath ? join(root, ...relativePath.split('/')) : root;
 }
@@ -117,6 +96,30 @@ function markdownLinkTargets(markdown) {
 function linkPathWithoutFragment(target) {
     return target.split('#')[0];
 }
+
+function sliceBetween(text, startBoundary, endBoundary, label = `${startBoundary} to ${endBoundary}`) {
+    const start = text.indexOf(startBoundary);
+    const endSearchStart = start >= 0 ? start + startBoundary.length : 0;
+    const end = text.indexOf(endBoundary, endSearchStart);
+
+    assert.ok(start >= 0, `${label} start boundary is present`);
+    assert.ok(end >= 0, `${label} end boundary is present`);
+    assert.ok(end > start, `${label} end boundary follows start boundary`);
+
+    return text.slice(start, end);
+}
+
+function sliceFrom(text, startBoundary, label = startBoundary) {
+    const start = text.indexOf(startBoundary);
+
+    assert.ok(start >= 0, `${label} start boundary is present`);
+
+    return text.slice(start);
+}
+
+test('sliceBetween ignores an end boundary inside the start boundary', () => {
+    assert.equal(sliceBetween('abc-body-c', 'abc', 'c'), 'abc-body-');
+});
 
 async function assertGeneratedGuideLinksResolve(outputRoot, targetPattern, description) {
     const guideRelativePath = 'agentic-engineering/docs/README.md';
@@ -245,7 +248,7 @@ test('Linear prompt orders push visibility before gatekeeper and PR creation', a
 
 test('PR review workflow orders push visibility, fresh thread snapshot, gatekeeper, then replies and resolution', async () => {
     const text = await read(prReviewSkillPath);
-    const workflow = sliceBetween(text, '## Workflow', '## Review Comment Validation Gate');
+    const workflow = sliceBetween(text, '## Workflow', '## Review Comment Validation Gate', 'PR review workflow section');
 
     const pushVisibility = workflow.indexOf('9. **Commit and push to the PR branch and confirm PR visibility.**');
     const freshThreadSnapshot = workflow.indexOf('10. **Refresh unresolved/reopened review-thread state after push visibility.**');
@@ -256,6 +259,10 @@ test('PR review workflow orders push visibility, fresh thread snapshot, gatekeep
     assert.ok(freshThreadSnapshot > pushVisibility, 'fresh thread snapshot follows push visibility');
     assert.ok(gatekeeper > freshThreadSnapshot, 'gatekeeper follows fresh thread snapshot');
     assert.ok(replyAndResolve > gatekeeper, 'reply/resolve text follows gatekeeper pass');
+    assert.match(text, /^## How to obtain real thread and comment IDs$/m);
+    assert.match(workflow, /applying the `workflow-safety-gates` Remote Read-Only Tool Intent Gate before the freshness read/);
+    assert.match(workflow, /Comment-writing, reply, status-changing, review-write, approval, request_changes, dismiss, resolve, unresolve, delete, submit, create, update, merge, push, write, and other mutation-primary tools or methods are forbidden as sanity checks/);
+    assert.match(workflow, /Read-only review comment\/thread\/status metadata reads are allowed when their primary purpose is freshness or metadata readback/);
     assert.match(workflow, /do not declare the round complete, recommend merge, post reviewer-facing replies, or resolve threads while it reports `fail` or `BLOCK`/);
     assert.match(workflow, /If the required real reply or resolve ID is unavailable, block only that affected reply or resolve sub-action/);
 });
@@ -275,6 +282,7 @@ test('PR review workflow is split into user coordinator and internal focused ski
     assert.match(coordinator, /`pr-review-fix-cycle`/);
     assert.match(coordinator, /`pr-review-round-closure`/);
     assert.match(coordinator, /`pr-review-reply-resolve`/);
+    assert.match(coordinator, /Do not use a generic GraphQL CLI, generic API CLI, remote execute, or execute-capable path to recover missing IDs/);
 });
 
 test('pack guide contract uses the real source guide path and documents broad validation flow placement', async () => {
@@ -286,7 +294,7 @@ test('pack guide contract uses the real source guide path and documents broad va
     const guide = await read(docsPath);
     assert.doesNotMatch(readme, /docs\/agentic\/README\.md/);
 
-    const flowchart = sliceBetween(guide, '### PR Review Comments Workflow Flowchart', '### Dual Review Arbitration Flowchart');
+    const flowchart = sliceBetween(guide, '### PR Review Comments Workflow Flowchart', '### Dual Review Arbitration Flowchart', 'PR review guide flowchart section');
     const runTests = flowchart.indexOf('Run Tests');
     const broadGate = flowchart.indexOf('Broad Safe Validation Gate');
     const commitHygiene = flowchart.indexOf('Commit Hygiene');
@@ -395,7 +403,7 @@ test('PR review thread context documents active PR, MCP comments, GraphQL fallba
 test('PR review GraphQL fallback is orchestrator-mediated and bounded', async () => {
     const text = await read(prReviewThreadContextPath);
     const readme = await read('README.md');
-    const fallbackSection = sliceBetween(text, '3. Orchestrator-mediated `gh api graphql` fallback', 'Do not use any mutating GitHub');
+    const fallbackSection = sliceBetween(text, '3. Orchestrator-mediated `gh api graphql` fallback', 'Do not use any mutating GitHub', 'PR review GraphQL fallback section');
     const readmeFallbackLine = readme.split('\n').find((line) => line.includes('GraphQL fallback')) ?? '';
 
     assert.match(fallbackSection, /Orchestrator-mediated `gh api graphql` fallback/);
@@ -525,7 +533,7 @@ test('direct PR review invocation blocks or routes through orchestrator when Git
 
 test('PR review workflow inserts Broad Safe Validation Gate between targeted checks and readiness', async () => {
     const text = await read(prReviewSkillPath);
-    const workflow = sliceBetween(text, '## Workflow', '## Review Comment Validation Gate');
+    const workflow = sliceBetween(text, '## Workflow', '## Review Comment Validation Gate', 'PR review broad validation workflow section');
 
     const targetedVerification = workflow.indexOf('Verify fixes locally with targeted evidence for each addressed comment.');
     const broadGate = workflow.indexOf('5a. **Broad Safe Validation Gate.**');
@@ -544,7 +552,7 @@ test('PR review workflow inserts Broad Safe Validation Gate between targeted che
 
 test('PR review Broad Safe Validation Gate is repository-agnostic and separates output-writing validation', async () => {
     const text = await read(prReviewFixCyclePath);
-    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate');
+    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate', 'PR review fix-cycle broad validation section');
 
     assert.match(section, /Broad safe validation is the broadest bounded, non-mutating, locally supported validation relevant to the changed surface/);
     assert.match(section, /Discover candidate validation commands from repository-local evidence only/);
@@ -558,8 +566,8 @@ test('PR review Broad Safe Validation Gate is repository-agnostic and separates 
 test('PR review Broad Safe Validation Gate requires fresh final-worktree evidence before readiness', async () => {
     const coordinator = await read(prReviewSkillPath);
     const text = await read(prReviewFixCyclePath);
-    const workflow = sliceBetween(coordinator, '## Workflow', '## Review Comment Validation Gate');
-    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate');
+    const workflow = sliceBetween(coordinator, '## Workflow', '## Review Comment Validation Gate', 'PR review workflow freshness section');
+    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate', 'PR review fix-cycle freshness section');
     const hardGate = `${coordinator}\n${text}`;
 
     assert.match(workflow, /require broad safe validation before commit\/push readiness, reviewer-facing replies, or review-thread resolution/);
@@ -578,7 +586,7 @@ test('PR review Broad Safe Validation Gate blocks failed or blocked broad valida
     const coordinator = await read(prReviewSkillPath);
     const text = await read(prReviewFixCyclePath);
     const combined = `${coordinator}\n${text}`;
-    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate');
+    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate', 'PR review fix-cycle blocking section');
     const failedStatus = section.match(/- `failed`:[^\n]+/)?.[0] ?? '';
 
     assert.match(failedStatus, /This blocks push, reviewer-facing replies, and thread resolution until the selected broad safe validation failure is addressed, or until the workflow is re-scoped or reclassified so that command is no longer the selected broad safe validation/);
@@ -597,7 +605,7 @@ test('PR review Broad Safe Validation Gate blocks failed or blocked broad valida
 
 test('PR review status definitions require freshness for non-passing broad validation outcomes', async () => {
     const text = await read(prReviewFixCyclePath);
-    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate');
+    const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate', 'PR review broad validation status section');
 
     for (const status of ['skipped', 'not applicable', 'mutating-only']) {
         const line = section.split('\n').find((candidate) => candidate.startsWith('- `' + status + '`:')) ?? '';
@@ -703,7 +711,7 @@ test('PR review reply-resolve separates direct replies from pending and new revi
 
 test('workflow safety PR readiness requires broad validation evidence for PR-review fix cycles', async () => {
     const text = await read(workflowSafetyGatesPath);
-    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate');
+    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate', 'PR readiness broad validation evidence section');
 
     assert.match(section, /Before GitHub PR creation, require explicit evidence for each mandatory upstream step/);
     assert.match(section, /Broad Safe Validation Gate evidence is required when PR-review fix cycles are in scope/);
@@ -714,7 +722,7 @@ test('workflow safety PR readiness requires broad validation evidence for PR-rev
 
 test('workflow safety PR readiness accepts skipped broad validation only with evidence and policy basis', async () => {
     const text = await read(workflowSafetyGatesPath);
-    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate');
+    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate', 'PR readiness skipped broad validation section');
 
     assert.match(section, /`skipped` and `not applicable` Broad Safe Validation Gate statuses satisfy readiness only when the output includes the full inspected evidence package and the policy\/risk basis for accepting that status/);
     assert.match(section, /repository-local discovery, candidate command\(s\), selected or unavailable command conclusion, classification basis, freshness for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
@@ -723,7 +731,7 @@ test('workflow safety PR readiness accepts skipped broad validation only with ev
 
 test('workflow safety PR readiness treats mutating-only broad validation as conditional evidence, not a pass', async () => {
     const text = await read(workflowSafetyGatesPath);
-    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate');
+    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate', 'PR readiness mutating-only broad validation section');
 
     assert.match(section, /`mutating-only` is not a pass/);
     assert.match(section, /It satisfies readiness only when the output includes the full inspected evidence package above AND either separately reported authorized mutating\/output-writing command results with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covering not running the mutating\/output-writing candidate/);
@@ -732,7 +740,7 @@ test('workflow safety PR readiness treats mutating-only broad validation as cond
 
 test('workflow safety PR readiness skipped-step wording blocks only missing evidence or risk basis', async () => {
     const text = await read(workflowSafetyGatesPath);
-    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate');
+    const section = sliceBetween(text, '## PR Readiness Evidence Gate', '## PR Review Visibility and Thread Gate', 'PR readiness skipped-step wording section');
 
     assert.match(section, /If any mandatory step was skipped without the required evidence, policy basis, or residual-risk basis, only logged without a real invocation, unavailable, failed, or blocked, do not create the PR/);
     assert.match(section, /Valid evidence-backed `skipped` and `not applicable` statuses do not block solely because they are skips/);
@@ -741,7 +749,7 @@ test('workflow safety PR readiness skipped-step wording blocks only missing evid
 
 test('orchestrator PR creation guidance preserves workflow safety broad-validation status semantics', async () => {
     const text = await read(orchestratorPath);
-    const section = sliceFrom(text, '## PR Creation Guidance');
+    const section = sliceFrom(text, '## PR Creation Guidance', 'orchestrator PR creation guidance section');
 
     assert.match(section, /Apply the `workflow-safety-gates` PR Readiness Evidence Gate status semantics/);
     assert.match(section, /`skipped` and `not applicable` satisfy readiness only with the full inspected evidence package and policy\/risk basis/);
@@ -786,10 +794,19 @@ test('gatekeeper consumes targeted-vs-broad evidence and blocks missing or block
 
 test('gatekeeper requires broad-validation freshness evidence and blocks stale or unknown freshness', async () => {
     const text = await read(reviewCycleGatekeeperPath);
-    const requiredInputs = sliceBetween(text, '\n## Required Inputs', '\n## Severity Vocabulary');
-    const gateRules = sliceBetween(text, '\n## Gate Rules', '\n## Waiver Rules');
-    const decisionProcedure = sliceBetween(text, '\n## Decision Procedure', '\n### Insufficient Input');
-    const outputFormat = sliceBetween(text, '\n## Output Format', '\n## Anti-Patterns');
+    const requiredInputsStart = text.indexOf('\n## Required Inputs');
+    const gateRulesStart = text.indexOf('\n## Gate Rules');
+    const decisionProcedureStart = text.indexOf('\n## Decision Procedure');
+    const outputFormatStart = text.indexOf('\n## Output Format');
+    assert.ok(requiredInputsStart >= 0, 'gatekeeper required inputs heading is present');
+    assert.ok(gateRulesStart >= 0, 'gatekeeper gate rules heading is present');
+    assert.ok(decisionProcedureStart >= 0, 'gatekeeper decision procedure heading is present');
+    assert.ok(outputFormatStart >= 0, 'gatekeeper output format heading is present');
+
+    const requiredInputs = sliceBetween(text, '\n## Required Inputs', '\n## Severity Vocabulary', 'gatekeeper required inputs section');
+    const gateRules = sliceBetween(text, '\n## Gate Rules', '\n## Waiver Rules', 'gatekeeper gate rules section');
+    const decisionProcedure = sliceBetween(text, '\n## Decision Procedure', '\n### Insufficient Input', 'gatekeeper decision procedure section');
+    const outputFormat = sliceBetween(text, '\n## Output Format', '\n## Anti-Patterns', 'gatekeeper output format section');
 
     assert.match(requiredInputs, /freshness evidence for the final candidate worktree\/fix batch/);
     assert.match(requiredInputs, /If contextual\/independent review, builder\/test follow-up, formatting, generated-output handling, or any other fix step changed the worktree after broad validation evidence was produced, that evidence is stale until rerun or explicitly re-established for the final changed surface/);
@@ -804,7 +821,7 @@ test('gatekeeper requires broad-validation freshness evidence and blocks stale o
 
 test('gatekeeper Broad Safe Validation Gate sample template names candidate selection and dirty-state boundary fields', async () => {
     const text = await read(reviewCycleGatekeeperPath);
-    const sample = sliceBetween(text, 'Broad Safe Validation Gate evidence:', 'Waivers:');
+    const sample = sliceBetween(text, 'Broad Safe Validation Gate evidence:', 'Waivers:', 'gatekeeper broad validation sample section');
 
     assert.match(sample, /- repository-local discovery evidence: <docs\/scripts\/config\/prior-local-evidence inspected>/);
     assert.match(sample, /- candidate command\(s\) inspected: <commands or None>/);
@@ -905,6 +922,43 @@ test('workflow safety create-PR allowlist row requires audited PR body', async (
     assert.match(row, /PR Body Audit Gate/);
     assert.match(row, /`pass` or `repaired`/);
     assert.match(row, /complete candidate PR body/);
+});
+
+test('workflow safety gates require read-only remote tools for read-only verification', async () => {
+    const text = await read(workflowSafetyGatesPath);
+
+    assert.match(text, /## Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /read-only remote verification, sanity check, metadata read, metadata readback, or parallel batch of remote checks, including pre-mutation and post-mutation reads/);
+    assert.match(text, /select only tools or methods whose primary purpose is read-only metadata or verification/);
+    assert.match(text, /when they describe the tool or method's primary action or operation/);
+    assert.match(text, /Do not deny a read-primary method solely because a mutation-associated word appears inside the object being read or the metadata category being returned/);
+    assert.match(text, /Read-primary tools or methods such as `get_\*`, `list_\*`, `read`, `search`, PR\/status metadata reads, `pull_request_read method=get_review_comments`, `pull_request_read method=get_reviews`, and `pull_request_read method=get_comments` are allowed when their declared purpose is read-only/);
+    assert.match(text, /Mutation-primary operations remain forbidden for read-only verification/);
+    assert.match(text, /Mutation-implying primary actions include comment-writing, reply, add-comment, status-changing, `approve`, `request_changes`, `dismiss`, `close`, `reopen`, `assign`, `label`, `resolve`, `unresolve`, `submit`, `delete`, `create`, `update`, `merge`, `push`, `write`/);
+    assert.match(text, /Remote mutation-capable tools or methods must not be batched in parallel/);
+    assert.match(text, /Parallel remote read batches are allowed only when every tool and method in the batch is read-only by primary purpose/);
+    assert.match(text, /stop all remote operations immediately/);
+    assert.match(text, /Do not repeat the same remote call as recovery/);
+    assert.match(text, /the next remote action passes the appropriate fresh gate: Remote Read-Only Tool Intent Gate for read-only continuation, or Mutation Intent Gate plus the applicable remote mutation allowlist for mutation continuation/);
+    assert.match(text, /Before any remote operation resumes, record a wrong-tool incident report that includes the intended action, actual tool or method, observed result, whether anything changed, and the guard or remediation added/);
+});
+
+test('orchestrator applies read-only remote intent gate to readbacks and parallel checks', async () => {
+    const text = await read(orchestratorPath);
+
+    assert.match(text, /Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /Before any GitHub or Linear read-only remote verification, sanity check, metadata read, metadata readback, or remote-check batch, including pre-mutation and post-mutation reads, apply the Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /Read-only remote verification must use tools or methods that are read-only by primary purpose/);
+    assert.match(text, /`get_\*`, `list_\*`, `read`, `search`, PR\/status metadata reads, and `pull_request_read` methods such as `get_review_comments`, `get_reviews`, and `get_comments` remain allowed when the operation is read-only/);
+    assert.match(text, /Parallel remote checks may batch only tools and methods that are read-only by primary purpose/);
+    assert.match(text, /For PR review-comment workflow read-only remote verification, sanity checks, metadata reads\/readbacks, or remote-check batches, apply the canonical `workflow-safety-gates` Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /Use read-only PR review, issue, repository, status, or Linear metadata tools or methods by primary purpose for those reads; do not use mutation-primary tools or methods as sanity checks or read-only verification/);
+    assert.match(text, /For PR creation preparation reads and post-creation sanity readbacks, apply the `workflow-safety-gates` Remote Read-Only Tool Intent Gate before any PR metadata read/);
+    assert.match(text, /`pull_request_read`-style reads/);
+    assert.match(text, /PR\/status metadata reads remain allowed when their operation is read-only/);
+    assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools as sanity checks/);
+    assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools for the readback/);
+    assert.equal(text.match(/Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools as sanity checks/g)?.length, 1);
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
@@ -1052,7 +1106,7 @@ test('PR description template policy owns template discovery and operator-facing
 
 test('Linear workflow reports canonical PR template status vocabulary', async () => {
     const text = await read(linearSkillPath);
-    const output = sliceBetween(text, '## Output Format', '## Linear Comment Audience and Content');
+    const output = sliceBetween(text, '## Output Format', '## Linear Comment Audience and Content', 'Linear PR template status output section');
 
     assert.match(output, /\*\*PR template status:\*\* One of/);
     assertPrTemplateStatuses(output, 'Linear PR template status output');
@@ -1060,7 +1114,7 @@ test('Linear workflow reports canonical PR template status vocabulary', async ()
 
 test('orchestrator Output Format reports canonical PR template status vocabulary', async () => {
     const text = await read(orchestratorPath);
-    const output = sliceFrom(text, '## Output Format');
+    const output = sliceFrom(text, '## Output Format', 'orchestrator output format section');
 
     assert.match(output, /PR template status when PR creation happens: one of/);
     assertPrTemplateStatuses(output, 'orchestrator PR template status output');
@@ -1068,7 +1122,7 @@ test('orchestrator Output Format reports canonical PR template status vocabulary
 
 test('workflow safety PR Template Gate reports canonical PR template status vocabulary', async () => {
     const text = await read(workflowSafetyGatesPath);
-    const templateGate = sliceBetween(text, '## PR Template Gate', '### PR Body Audience');
+    const templateGate = sliceBetween(text, '## PR Template Gate', '### PR Body Audience', 'workflow safety PR Template Gate');
 
     assert.match(templateGate, /Operator-facing template status must be one of/);
     assertPrTemplateStatuses(templateGate, 'workflow safety PR Template Gate');
@@ -1076,7 +1130,7 @@ test('workflow safety PR Template Gate reports canonical PR template status voca
 
 test('orchestrator PR creation guidance blocks ambiguous template choice when it cannot ask', async () => {
     const text = await read(orchestratorPath);
-    const section = sliceBetween(text, '\n## PR Creation Guidance\n', '\n## Output Format\n');
+    const section = sliceBetween(text, '\n## PR Creation Guidance\n', '\n## Output Format\n', 'orchestrator PR creation guidance section');
 
     assert.match(section, /blocked-on-template-choice/);
 });
@@ -1086,9 +1140,9 @@ test('selected unreadable template blocks when readable alternatives exist', asy
     const workflowSafety = await read(workflowSafetyGatesPath);
     const rootReadme = await read(rootReadmePath);
     const guideReadme = await read(docsPath);
-    const templateGate = sliceBetween(workflowSafety, '## PR Template Gate', '### PR Body Audience');
-    const rootLinear = sliceBetween(rootReadme, '## Linear Issue Workflow', '### Invalid Triage Gate');
-    const guideTemplateGate = sliceBetween(guideReadme, '### Pull Request Template Gate', '### External Project Scope Gate');
+    const templateGate = sliceBetween(workflowSafety, '## PR Template Gate', '### PR Body Audience', 'workflow safety selected unreadable template gate');
+    const rootLinear = sliceBetween(rootReadme, '## Linear Issue Workflow', '### Invalid Triage Gate', 'root README Linear Issue Workflow section');
+    const guideTemplateGate = sliceBetween(guideReadme, '### Pull Request Template Gate', '### External Project Scope Gate', 'generated guide Pull Request Template Gate section');
 
     assert.match(templatePolicy, /selected-template-unreadable-choice-required/);
     assert.match(templatePolicy, /Ambiguity is based on readable templates, not total candidate count/);
@@ -1129,8 +1183,8 @@ test('workflow safety PR Body Audit Gate is canonical for all PR body paths', as
     const linear = await read(linearSkillPath);
     const prReview = await read(prReviewSkillPath);
     const composer = await read(pullRequestDescriptionPath);
-    const auditGate = sliceBetween(workflowSafety, '### PR Body Audit Gate', '## PR Readiness Evidence Gate');
-    const prReviewIntegration = sliceBetween(prReview, '## Integration with Pull Request Description', '\n## Output Format');
+    const auditGate = sliceBetween(workflowSafety, '### PR Body Audit Gate', '## PR Readiness Evidence Gate', 'workflow safety PR Body Audit Gate section');
+    const prReviewIntegration = sliceBetween(prReview, '## Integration with Pull Request Description', '\n## Output Format', 'PR review integration with pull request description section');
 
     assert.match(auditGate, /Before a workflow sends a body to `mcp_github_create_pull_request`/);
     assert.match(auditGate, /publishes a PR-ready body for manual creation/);
@@ -1161,8 +1215,8 @@ test('workflow safety PR Body Audit Gate is canonical for all PR body paths', as
 test('operator-facing docs require PR Body Audit Gate before PR creation', async () => {
     const rootReadme = await read(rootReadmePath);
     const guideReadme = await read(docsPath);
-    const rootLinear = sliceBetween(rootReadme, '## Linear Issue Workflow', '### Invalid Triage Gate');
-    const guideLinear = sliceBetween(guideReadme, '### Linear Issue Workflow Flowchart', '### PR Review Comments Workflow Flowchart');
+    const rootLinear = sliceBetween(rootReadme, '## Linear Issue Workflow', '### Invalid Triage Gate', 'root README Linear Issue Workflow section');
+    const guideLinear = sliceBetween(guideReadme, '### Linear Issue Workflow Flowchart', '### PR Review Comments Workflow Flowchart', 'generated guide Linear Issue Workflow Flowchart section');
 
     for (const [path, text] of [
         [rootReadmePath, rootLinear],
@@ -1186,7 +1240,7 @@ test('operator-facing docs require PR Body Audit Gate before PR creation', async
 
 test('Linear Issue to PR docs summary checks template choice before PR Body Audit Gate', async () => {
     const guideReadme = await read(docsPath);
-    const section = sliceBetween(guideReadme, '### Linear Issue to PR', '### Addressing PR Review Comments');
+    const section = sliceBetween(guideReadme, '### Linear Issue to PR', '### Addressing PR Review Comments', 'generated guide Linear Issue to PR summary section');
 
     const templateCheck = section.indexOf('8. Checks the target repository for PR templates');
     const auditGate = section.indexOf('9. Applies the PR Body Audit Gate');
@@ -1207,7 +1261,7 @@ test('Verified non-changes citation rules are inherited by direct PR body paths'
     const workflowSafety = await read(workflowSafetyGatesPath);
     const orchestrator = await read(orchestratorPath);
     const linear = await read(linearSkillPath);
-    const auditGate = sliceBetween(workflowSafety, '### PR Body Audit Gate', '## PR Readiness Evidence Gate');
+    const auditGate = sliceBetween(workflowSafety, '### PR Body Audit Gate', '## PR Readiness Evidence Gate', 'workflow safety verified non-changes citation section');
 
     assert.match(auditGate, /`## Verified non-changes` items cite all required evidence/);
     assert.match(auditGate, /in-repo code path/);
@@ -1223,7 +1277,7 @@ test('Verified non-changes citation rules are inherited by direct PR body paths'
 test('PR description support skills hard-stop on direct invocation', async () => {
     for (const path of [prDescriptionTemplatePolicyPath, prDescriptionBodyAuditPath]) {
         const text = await read(path);
-        const section = sliceBetween(text, '## Direct Invocation Hard Stop', '## Responsibility');
+        const section = sliceBetween(text, '## Direct Invocation Hard Stop', '## Responsibility', `${path} direct invocation hard stop section`);
 
         assert.equal(frontmatterValue(text, 'user-invocable'), 'false', `${path} remains internal`);
         assert.match(section, /blocked-direct-invocation/, `${path} has a direct-invocation blocker`);
@@ -1235,7 +1289,7 @@ test('PR description support skills hard-stop on direct invocation', async () =>
 
 test('PR body audit section blocks support-skill leakage and partial Verified non-changes', async () => {
     const workflowSafety = await read(workflowSafetyGatesPath);
-    const auditGate = sliceBetween(workflowSafety, '### PR Body Audit Gate', '## PR Readiness Evidence Gate');
+    const auditGate = sliceBetween(workflowSafety, '### PR Body Audit Gate', '## PR Readiness Evidence Gate', 'workflow safety PR Body Audit Gate leakage section');
 
     assert.match(auditGate, /support-skill/);
     assert.match(auditGate, /unresolved workflow\/template leakage blocks/);

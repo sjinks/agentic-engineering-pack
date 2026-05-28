@@ -133,6 +133,17 @@ Before any mutating, state-changing, external-system, branch, git, PR creation, 
 - Placeholder, sentinel, guessed, fabricated, dummy, inferred, stale, or example content blocks any mutation. Values such as `DO_NOT_USE_AGAIN` are blockers, not safe inputs.
 - Never call mutating tools as probes to discover capability, permissions, paths, branches, IDs, or parameter validity.
 
+## Remote Read-Only Tool Intent Gate
+
+Before any read-only remote verification, sanity check, metadata read, metadata readback, or parallel batch of remote checks, including pre-mutation and post-mutation reads:
+
+- Declare the read-only intent and select only tools or methods whose primary purpose is read-only metadata or verification for that remote system.
+- Tool names, method names, or primary purposes implying mutation are forbidden for read-only verification when they describe the tool or method's primary action or operation, even when the expected result is a no-op. Do not deny a read-primary method solely because a mutation-associated word appears inside the object being read or the metadata category being returned. Read-primary tools or methods such as `get_*`, `list_*`, `read`, `search`, PR/status metadata reads, `pull_request_read method=get_review_comments`, `pull_request_read method=get_reviews`, and `pull_request_read method=get_comments` are allowed when their declared purpose is read-only.
+- Mutation-primary operations remain forbidden for read-only verification. Mutation-implying primary actions include comment-writing, reply, add-comment, status-changing, `approve`, `request_changes`, `dismiss`, `close`, `reopen`, `assign`, `label`, `resolve`, `unresolve`, `submit`, `delete`, `create`, `update`, `merge`, `push`, `write`, and similar state-changing verbs.
+- Remote mutation-capable tools or methods must not be batched in parallel. Parallel remote read batches are allowed only when every tool and method in the batch is read-only by primary purpose.
+- If a remote tool-intent mismatch is noticed before or after a call, stop all remote operations immediately. Do not repeat the same remote call as recovery, and do not resume remote operations until the incident report below is recorded and the next remote action passes the appropriate fresh gate: Remote Read-Only Tool Intent Gate for read-only continuation, or Mutation Intent Gate plus the applicable remote mutation allowlist for mutation continuation.
+- Before any remote operation resumes, record a wrong-tool incident report that includes the intended action, actual tool or method, observed result, whether anything changed, and the guard or remediation added.
+
 ## GitHub Repository File Mutation Denial
 
 GitHub repository file writes are globally denied in this pack, including outside PR creation. Do not call `mcp_github_create_or_update_file`, `mcp_github_push_files`, or `mcp_github_delete_file` for implementation, patching, branch preparation, PR creation, recovery, or any substitute workflow.
