@@ -26,7 +26,7 @@ This user-invocable coordinator addresses GitHub pull request (PR) review commen
 
 GitHub context and mutation remain orchestrator-owned. Specialists receive distilled PR data and must not be granted broad `github/*`. Direct invocation is valid only when the operator provides orchestrator-mediated PR context or the workflow can use an approved VS Code active-PR read surface; without that context or grant, stop and route the operator through the orchestrator instead of implying the skill can fetch PR data through direct `github/*` access. Apply `workflow-safety-gates` before any reply, review/status mutation, thread resolution, branch/git mutation, or PR action. GitHub repository file mutation tools remain denied; all fixes go through local Builder/Test edit-and-push mechanics.
 
-### How to obtain real thread and comment IDs
+## How to obtain real thread and comment IDs
 
 Before calling `resolve_thread`, `unresolve_thread`, or posting a reply, perform a read-only fetch to obtain the actual IDs. Do not derive IDs from comment URLs, file paths, line numbers, or prior partial reads.
 

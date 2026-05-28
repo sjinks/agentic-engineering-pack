@@ -79,27 +79,6 @@ function frontmatterValue(text, key) {
     return frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.trim();
 }
 
-function boundaryIndex(text, boundary, fromIndex = 0) {
-    const index = text.indexOf(boundary, fromIndex);
-
-    assert.notEqual(index, -1, `boundary is present: ${boundary}`);
-
-    return index;
-}
-
-function sliceBetween(text, startBoundary, endBoundary, fromIndex = 0) {
-    const start = boundaryIndex(text, startBoundary, fromIndex);
-    const end = boundaryIndex(text, endBoundary, start + startBoundary.length);
-
-    assert.ok(end > start, `${endBoundary} follows ${startBoundary}`);
-
-    return text.slice(start, end);
-}
-
-function sliceFrom(text, startBoundary, fromIndex = 0) {
-    return text.slice(boundaryIndex(text, startBoundary, fromIndex));
-}
-
 function pathWithin(root, relativePath) {
     return relativePath ? join(root, ...relativePath.split('/')) : root;
 }
@@ -118,7 +97,7 @@ function linkPathWithoutFragment(target) {
     return target.split('#')[0];
 }
 
-function sliceBetween(text, startNeedle, endNeedle, label) {
+function sliceBetween(text, startNeedle, endNeedle, label = `${startNeedle} to ${endNeedle}`) {
     const start = text.indexOf(startNeedle);
     const end = text.indexOf(endNeedle, Math.max(start, 0));
 
@@ -129,7 +108,7 @@ function sliceBetween(text, startNeedle, endNeedle, label) {
     return text.slice(start, end);
 }
 
-function sliceFrom(text, startNeedle, label) {
+function sliceFrom(text, startNeedle, label = startNeedle) {
     const start = text.indexOf(startNeedle);
 
     assert.ok(start >= 0, `${label} start heading is present`);
@@ -275,6 +254,7 @@ test('PR review workflow orders push visibility, fresh thread snapshot, gatekeep
     assert.ok(freshThreadSnapshot > pushVisibility, 'fresh thread snapshot follows push visibility');
     assert.ok(gatekeeper > freshThreadSnapshot, 'gatekeeper follows fresh thread snapshot');
     assert.ok(replyAndResolve > gatekeeper, 'reply/resolve text follows gatekeeper pass');
+    assert.match(text, /^## How to obtain real thread and comment IDs$/m);
     assert.match(workflow, /applying the `workflow-safety-gates` Remote Read-Only Tool Intent Gate before the freshness read/);
     assert.match(workflow, /Comment-writing, reply, status-changing, review-write, approval, request_changes, dismiss, resolve, unresolve, delete, submit, create, update, merge, push, write, and other mutation-primary tools or methods are forbidden as sanity checks/);
     assert.match(workflow, /Read-only review comment\/thread\/status metadata reads are allowed when their primary purpose is freshness or metadata readback/);
@@ -966,12 +946,14 @@ test('orchestrator applies read-only remote intent gate to readbacks and paralle
     assert.match(text, /Read-only remote verification must use tools or methods that are read-only by primary purpose/);
     assert.match(text, /`get_\*`, `list_\*`, `read`, `search`, PR\/status metadata reads, and `pull_request_read` methods such as `get_review_comments`, `get_reviews`, and `get_comments` remain allowed when the operation is read-only/);
     assert.match(text, /Parallel remote checks may batch only tools and methods that are read-only by primary purpose/);
-    assert.match(text, /Before GitHub or Linear read-only remote verification, sanity checks, metadata reads, metadata readbacks, or remote-check batches, including pre-mutation and post-mutation reads, apply the Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /For PR review-comment workflow read-only remote verification, sanity checks, metadata reads\/readbacks, or remote-check batches, apply the canonical `workflow-safety-gates` Remote Read-Only Tool Intent Gate/);
+    assert.match(text, /Use read-only PR review, issue, repository, status, or Linear metadata tools or methods by primary purpose for those reads; do not use mutation-primary tools or methods as sanity checks or read-only verification/);
     assert.match(text, /For PR creation preparation reads and post-creation sanity readbacks, apply the `workflow-safety-gates` Remote Read-Only Tool Intent Gate before any PR metadata read/);
     assert.match(text, /`pull_request_read`-style reads/);
     assert.match(text, /PR\/status metadata reads remain allowed when their operation is read-only/);
     assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools as sanity checks/);
     assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools for the readback/);
+    assert.equal(text.match(/Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools as sanity checks/g)?.length, 1);
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
