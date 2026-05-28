@@ -97,24 +97,29 @@ function linkPathWithoutFragment(target) {
     return target.split('#')[0];
 }
 
-function sliceBetween(text, startNeedle, endNeedle, label = `${startNeedle} to ${endNeedle}`) {
-    const start = text.indexOf(startNeedle);
-    const end = text.indexOf(endNeedle, Math.max(start, 0));
+function sliceBetween(text, startBoundary, endBoundary, label = `${startBoundary} to ${endBoundary}`) {
+    const start = text.indexOf(startBoundary);
+    const endSearchStart = start >= 0 ? start + startBoundary.length : 0;
+    const end = text.indexOf(endBoundary, endSearchStart);
 
-    assert.ok(start >= 0, `${label} start heading is present`);
-    assert.ok(end >= 0, `${label} end heading is present`);
-    assert.ok(end > start, `${label} end heading follows start heading`);
+    assert.ok(start >= 0, `${label} start boundary is present`);
+    assert.ok(end >= 0, `${label} end boundary is present`);
+    assert.ok(end > start, `${label} end boundary follows start boundary`);
 
     return text.slice(start, end);
 }
 
-function sliceFrom(text, startNeedle, label = startNeedle) {
-    const start = text.indexOf(startNeedle);
+function sliceFrom(text, startBoundary, label = startBoundary) {
+    const start = text.indexOf(startBoundary);
 
-    assert.ok(start >= 0, `${label} start heading is present`);
+    assert.ok(start >= 0, `${label} start boundary is present`);
 
     return text.slice(start);
 }
+
+test('sliceBetween ignores an end boundary inside the start boundary', () => {
+    assert.equal(sliceBetween('abc-body-c', 'abc', 'c'), 'abc-body-');
+});
 
 async function assertGeneratedGuideLinksResolve(outputRoot, targetPattern, description) {
     const guideRelativePath = 'agentic-engineering/docs/README.md';
