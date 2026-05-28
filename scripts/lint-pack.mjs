@@ -124,14 +124,18 @@ async function walkInto(dir, rootAbs, results) {
 
 async function walkMarkdownFiles(rootAbs) {
     const results = [];
+    const scannedRoots = [];
+    const skippedRoots = [];
     for (const rel of PACK_DIRS) {
         const abs = path.join(rootAbs, rel);
         try {
             await stat(abs);
             await walkInto(abs, rootAbs, results);
+            scannedRoots.push(rel);
         } catch { /* missing pack subdir — skip */ }
+        if (!scannedRoots.includes(rel)) skippedRoots.push(rel);
     }
-    return results;
+    return { files: results, scannedRoots, skippedRoots };
 }
 
 async function buildKnownEntities(rootAbs) {
@@ -604,7 +608,7 @@ function reportCheck(label, findings, formatter) {
     for (const f of findings) formatter(f);
 }
 
-function printResults(check1, check2, check3, check4, check5, strict) {
+function printResults(check1, check2, check3, check4, check5, strict, scanStats) {
     console.log('Pack lint results');
     console.log('=================');
     console.log();
@@ -640,11 +644,16 @@ function printResults(check1, check2, check3, check4, check5, strict) {
     const all = [...check1, ...check2, ...check3, ...check4, ...check5];
     const errors = all.filter((f) => f.severity === 'error').length;
     const warnings = all.filter((f) => f.severity === 'warning').length;
-    const files = new Set(all.map((f) => f.file)).size;
+    const issueFiles = new Set(all.map((f) => f.file)).size;
 
     console.log('Summary');
     console.log('-------');
-    console.log(`${all.length} issues found across ${files} file${files === 1 ? '' : 's'}.`);
+    console.log(`Scanned markdown files: ${scanStats.scannedFiles}`);
+    console.log(`Scanned roots: ${scanStats.scannedRoots.length ? scanStats.scannedRoots.join(', ') : '(none)'}`);
+    if (scanStats.skippedRoots.length) {
+        console.log(`Skipped roots: ${scanStats.skippedRoots.join(', ')}`);
+    }
+    console.log(`${all.length} issues found across ${issueFiles} file${issueFiles === 1 ? '' : 's'}.`);
     console.log(`Errors: ${errors}, Warnings: ${warnings}`);
 
     let exitCode = 0;
@@ -668,8 +677,8 @@ async function main() {
 
     const scriptDir = path.dirname(fileURLToPath(import.meta.url));
     const repoRoot = await findRepoRoot(scriptDir);
-    const fileList = await walkMarkdownFiles(repoRoot);
-    const files = await loadFiles(fileList);
+    const scanResult = await walkMarkdownFiles(repoRoot);
+    const files = await loadFiles(scanResult.files);
     const known = await buildKnownEntities(repoRoot);
 
     const check1 = checkStaleNumericRefs(files);
@@ -678,7 +687,19 @@ async function main() {
     const check4 = checkOrchestratorSpecGateAnchors(files);
     const check5 = checkSectionNameDrift(files);
 
-    process.exit(printResults(check1, check2, check3, check4, check5, options.strict));
+    process.exit(printResults(
+        check1,
+        check2,
+        check3,
+        check4,
+        check5,
+        options.strict,
+        {
+            scannedFiles: scanResult.files.length,
+            scannedRoots: scanResult.scannedRoots,
+            skippedRoots: scanResult.skippedRoots,
+        },
+    ));
 }
 
 export {
