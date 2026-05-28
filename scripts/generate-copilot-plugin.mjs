@@ -371,6 +371,14 @@ async function main() {
     'agentic-engineering/docs',
     manifestContents.docs,
   );
+
+  copiedFiles += await copyTreeIfPresent(
+    repoRoot,
+    outputRoot,
+    'agentic-engineering/shared',
+    'agentic-engineering/shared',
+  );
+
   await rewriteGeneratedGuideIfPresent(outputRoot, new Set(manifestContents.commands));
 
   copiedFiles += await copyFileIfPresent(repoRoot, outputRoot, 'README.md', 'README.md');

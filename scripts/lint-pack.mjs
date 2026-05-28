@@ -128,12 +128,26 @@ async function walkMarkdownFiles(rootAbs) {
     const skippedRoots = [];
     for (const rel of PACK_DIRS) {
         const abs = path.join(rootAbs, rel);
+        let rootExists = false;
         try {
-            await stat(abs);
+            const rootInfo = await stat(abs);
+            if (!rootInfo.isDirectory()) {
+                throw new Error(`Expected markdown root to be a directory: ${abs}`);
+            }
+            rootExists = true;
             await walkInto(abs, rootAbs, results);
             scannedRoots.push(rel);
-        } catch { /* missing pack subdir — skip */ }
-        if (!scannedRoots.includes(rel)) skippedRoots.push(rel);
+        } catch (error) {
+            if (!rootExists && error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+                skippedRoots.push(rel);
+                continue;
+            }
+            const cause = error instanceof Error ? error.message : String(error);
+            if (rootExists) {
+                throw new Error(`Failed to traverse markdown root ${abs}: ${cause}`);
+            }
+            throw new Error(`Failed to inspect markdown root ${abs}: ${cause}`);
+        }
     }
     return { files: results, scannedRoots, skippedRoots };
 }
@@ -709,6 +723,7 @@ export {
     checkOrchestratorSpecGateAnchors,
     stripHtmlCommentLine,
     stripHtmlCommentsFromLines,
+    walkMarkdownFiles,
 };
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
