@@ -4,7 +4,7 @@ This workspace contains a v1 AI orchestration customization pack for VS Code and
 
 ## Guide
 
-For a comprehensive overview of the pack, including component descriptions, workflow diagrams, handoff contracts, gates, and failure modes this design prevents, see [docs/agentic/README.md](docs/agentic/README.md) (generated layout) or [agentic-engineering/docs/README.md](agentic-engineering/docs/README.md) (source layout). This guide contains Mermaid diagrams showing orchestration flows, Linear issue workflows, PR review comment workflows, review arbitration, and commit/PR finalization steps.
+For a comprehensive overview of the pack, including component descriptions, workflow diagrams, handoff contracts, gates, and failure modes this design prevents, see [agentic-engineering/docs/README.md](agentic-engineering/docs/README.md). This guide contains Mermaid diagrams showing orchestration flows, Linear issue workflows, PR review comment workflows, review arbitration, and commit/PR finalization steps.
 
 ## Generate an Installable Copilot Plugin
 
@@ -42,7 +42,12 @@ By default, output is written to `dist/agentic-engineering-pack`. Prompt files i
 | `.github/skills/commit-body-guidelines/SKILL.md` | Enforces structured commit bodies with rationale, impact, and validation sections. |
 | `.github/skills/conventional-commits/SKILL.md` | Generates, validates, revises, or applies Conventional Commit messages. |
 | `.github/skills/linear-issue-workflow/SKILL.md` | Fetches Linear issues, triages, fixes, and creates GitHub PRs. |
-| `.github/skills/pr-review-comments-workflow/SKILL.md` | Addresses PR review comments end-to-end: fetch, fix, verify, commit/push, reply/resolve. |
+| `.github/skills/pr-review-comments-workflow/SKILL.md` | User-invocable coordinator for PR review comments: context, validation, fix cycle, closure, reply/resolve. |
+| `.github/skills/pr-review-thread-context/SKILL.md` | Internal PR review thread context and real-ID acquisition. |
+| `.github/skills/pr-review-comment-validation/SKILL.md` | Internal evidence-based PR review comment classification. |
+| `.github/skills/pr-review-fix-cycle/SKILL.md` | Internal Builder/Test, verification, broad safe validation, commit, push, and visibility contract. |
+| `.github/skills/pr-review-round-closure/SKILL.md` | Internal gatekeeper handoff preparation for pushed-visible review rounds. |
+| `.github/skills/pr-review-reply-resolve/SKILL.md` | Internal reviewer-facing reply and thread-resolution contract. |
 | `.github/prompts/run-agentic-engineering.prompt.md` | Runs the orchestration workflow from chat. |
 | `.github/prompts/run-linear-issue-workflow.prompt.md` | Fetches and fixes Linear issues with agentic workflow. |
 | `.github/skills/pull-request-description/SKILL.md` | Generates copy/pasteable PR descriptions from branch commits. |
@@ -59,7 +64,7 @@ The pack uses minimal permissions per role.
 
 | Agent | Tools |
 | --- | --- |
-| Orchestrator | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*` |
+| Orchestrator | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*`, `github/*`, `github.vscode-pull-request-github/activePullRequest`, `github.vscode-pull-request-github/resolveReviewThread` |
 | Vault Context | exact `obsidian/...` read-only grants: `obsidian/search_vault`, `obsidian/search_vault_simple`, `obsidian/search_vault_smart`, `obsidian/get_vault_file`, `obsidian/get_vault_file_partial`, `obsidian/get_files_by_tag`, `obsidian/get_backlinks`, `obsidian/get_outgoing_links`, `obsidian/list_vault_files`, `obsidian/get_server_info` |
 | Research | `web` |
 | Environment Inspector | `read`, `search`, `execute` |
@@ -77,7 +82,7 @@ Builder and Test are the only agents with `edit` access. They may use execute fo
 
 Shared safety gates are centralized in `.github/skills/workflow-safety-gates/SKILL.md`. Builder and Test may create branches, commits, pushes, or other local git state/history mutations only when explicitly requested and after the shared git preflight and Local Git Mutation Delegation Contract pass. PR creation is orchestrator-only via `mcp_github_create_pull_request` after readiness evidence is present. Direct-entry agents, skills, and prompts still include local hard-stop rules for missing critical parameters, unsafe git targets, broad staging, default/base pushes, pushed/shared history rewrites without approval, mutating probes, and unavailable approvals.
 
-The pack uses exact-tool remote mutation allowlists. GitHub mutations are limited to `mcp_github_create_pull_request`, exact review-thread resolve/unresolve tools with real thread node IDs, and exact PR review reply/comment tools after pushed-visible changes or verified no-change rationale. Linear mutations are limited to approved issue comments or issue metadata updates inside Linear workflows after explicit user approval and exact tool/ID availability. GitHub repository file mutation tools are denied pack-wide: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
+The pack uses exact-tool remote mutation allowlists. GitHub mutations are limited to `mcp_github_create_pull_request`; MCP review-thread resolve/unresolve through exact `mcp_github_pull_request_review_write` `resolve_thread`/`unresolve_thread` methods with real thread node IDs; VS Code PR extension review-thread resolve-only through exact `github.vscode-pull-request-github/resolveReviewThread` with real thread node IDs; and exact PR review reply/comment tools after pushed-visible changes or verified no-change rationale. Linear mutations are limited to approved issue comments or issue metadata updates inside Linear workflows after explicit user approval and exact tool/ID availability. GitHub repository file mutation tools are denied pack-wide: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
 
 Obsidian vault context uses an exact read-only allowlist instead of a broad namespace grant. `vault-context-agent` may use only the exact tools listed above and must keep queries narrow, prefer partial reads, avoid secrets/personal/unrelated notes, return provenance plus read/not-read boundaries, and treat vault notes as advisory below user instructions, repository code, issue/PR data, tests, and verified behavior. Broad vault grants such as `obsidian/*` are not allowed. Vault mutation and side-effect tools are denied, including `mcp_obsidian_patch_vault_file`, `mcp_obsidian_update_active_file`, `mcp_obsidian_delete_active_file`, `mcp_obsidian_execute_obsidian_command`, `mcp_obsidian_execute_template`, and any active-file, create/update/delete/patch/rename, command-execution, template-execution, attachment, or other vault mutation tool.
 
@@ -85,7 +90,7 @@ Public web research and local execute reconnaissance are separate by design. `re
 
 No specialist has automated VS Code workspace-folder command access. When work targets a repository outside the attached workspace folders, the workflow stops and asks the operator to open or add the correct repository folder manually. Implementation, verification, git, push, and PR work proceed only after the target workspace folder is present and explicitly confirmed.
 
-The Orchestrator is the only holder of `linear/*` and `github/*` MCP tools. Specialists do not get these namespace grants because namespace-level MCP access includes mutation tools, and instructions alone are not an enforceable read-only boundary. The orchestrator owns remote reads for Linear issues, GitHub PR metadata/comments/status, and repository metadata, then passes distilled context, source URLs/IDs, status, timestamps, and read/not-read notes to specialists through handoffs. Remote mutations, including Linear updates, GitHub PR creation, review replies, and thread resolution, remain limited to the exact-tool allowlists plus explicit workflow gates, approval, verification, and real critical parameters.
+The Orchestrator is the only holder of `linear/*` and `github/*` MCP tools. It also holds the exact VS Code Pull Requests extension grants `github.vscode-pull-request-github/activePullRequest` and `github.vscode-pull-request-github/resolveReviewThread`; the active-PR surface is read-only context, while thread resolution still requires the exact allowlist gates. Specialists do not get namespace grants because namespace-level MCP access includes mutation tools, and instructions alone are not an enforceable read-only boundary. The orchestrator owns remote reads for Linear issues, GitHub PR metadata/comments/status, and repository metadata, then passes distilled context, source URLs/IDs, status, timestamps, and read/not-read notes to specialists through handoffs. Remote mutations, including Linear updates, GitHub PR creation, review replies, and thread resolution, remain limited to the exact-tool allowlists plus explicit workflow gates, approval, verification, and real critical parameters.
 
 The Orchestrator delegates private project-note context to `vault-context-agent` only when useful for project notes, ADRs, Acceptance criteria, prior decisions, threat models, or edge cases. It passes distilled vault context to other specialists and must not pass vault content to web tools or public research agents.
 
@@ -95,7 +100,7 @@ Skill and agent handoffs must be visible and real. Before invoking a skill workf
 
 ## PR Review Comments Workflow
 
-The `pr-review-comments-workflow` skill addresses PR review comments end-to-end. It fetches comments, classifies feedback, fixes issues, tests changes, reviews updates, runs commit hygiene, commits/pushes to the PR branch, and replies/resolves threads. It integrates with `pull-request-description` only for explicit PR body update requests or a final refresh after review-comment iterations are complete.
+The `pr-review-comments-workflow` skill is the user-facing coordinator for PR review comments. Focused internal skills handle context and real IDs, comment validation, the fix/verification/commit/push cycle, gatekeeper closure, and reviewer-facing reply/resolve. It integrates with `pull-request-description` only for explicit PR body update requests or a final refresh after review-comment iterations are complete.
 
 Key points:
 
@@ -105,6 +110,8 @@ Key points:
 - Local-only changes are not considered addressed PR comments.
 - Do not post `addressed`, `fixed`, `done`, or resolve threads until changes are committed, pushed to the PR branch, and visible in the PR.
 - Do not reply or resolve with placeholder IDs. PR review thread resolution requires the actual GitHub review thread node ID from PR thread data; if unavailable, report that resolution cannot be performed from current output.
+- Run the Broad Safe Validation Gate after targeted fix verification and before commit/push readiness, reviewer-facing replies, or review-thread resolution; the evidence must be fresh for the final candidate worktree/fix batch.
+- The approved context paths include the VS Code active-PR read surface, orchestrator-owned MCP `get_review_comments`, and an approval-bound GraphQL fallback only through an orchestrator-mediated local read-only handoff when real thread/comment IDs are missing from earlier reads. Direct invocation without orchestrator-provided context or an approved active-PR read must block or route through orchestrator-mediated context instead of implying direct `github/*` access. Specialists do not acquire GitHub context directly; the fallback returns only distilled owner/repo/PR context, thread node IDs, comment database IDs, pagination provenance, and read/not-read boundaries, and it must exhaust `pageInfo` cursors or report an incomplete/blocked snapshot. Thread node IDs and comment database IDs are different fields and are not interchangeable.
 - If commit/push cannot be completed, report local-only status and ask the user how to proceed instead of posting addressed replies.
 - Before pushing, invoke and apply `commit-hygiene`, `conventional-commits`, and `commit-body-guidelines`. If any required commit skill is unavailable or blocked, stop with local-only status instead of pushing, replying as addressed, or resolving threads.
 

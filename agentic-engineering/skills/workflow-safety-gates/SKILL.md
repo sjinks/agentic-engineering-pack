@@ -148,6 +148,16 @@ A future repository-file-write workflow must explicitly define all of the follow
 
 Until such a workflow exists, repository file writes through GitHub MCP remain blocked.
 
+## GitHub Read-Only PR Context Surfaces
+
+The VS Code GitHub Pull Requests extension active-PR surface is approved for read-only PR context acquisition:
+
+- `github.vscode-pull-request-github/activePullRequest` may be used to identify the active PR, repository, branch, PR number, and related read-only metadata when a PR workflow requires current editor context.
+- This surface does not authorize replies, status changes, thread resolution, branch creation, repository file mutation, PR creation, or any other mutation.
+- Values read from this surface are real critical-parameter inputs only for the fields it actually returns. Missing IDs, node IDs, SHAs, owner/repo values, or branch values remain missing and must not be inferred.
+- GitHub MCP read paths, including review comment reads such as `get_review_comments`, remain valid when the orchestrator owns them; this extension read surface does not replace the MCP paths or loosen specialist `github/*` restrictions.
+- Direct invocation of a PR workflow without orchestrator-held `github/*` context and without an approved active-PR read result must block or route through orchestrator-mediated context acquisition. Do not imply a direct skill or specialist can fetch PR/comments through `github/*` when that grant is unavailable.
+
 ## GitHub Remote Mutation Allowlist
 
 Only the following GitHub remote mutations are approved by this pack, and only after the relevant workflow gates, approvals, visibility checks, and critical-parameter checks pass.
@@ -155,10 +165,11 @@ Only the following GitHub remote mutations are approved by this pack, and only a
 | Action | Status | Exact tool or method requirement | Required gate |
 | --- | --- | --- | --- |
 | Create pull request | Approved | `mcp_github_create_pull_request` only | PR template, PR Body Audit Gate `pass` or `repaired` for the complete candidate PR body, verified branch, real owner/repo/base/head/title/body |
-| Resolve or unresolve review thread | Approved | `mcp_github_pull_request_review_write` with method `resolve_thread` or `unresolve_thread` only | Real review thread node ID from GitHub data; pushed-visible addressed state |
-| Reply/comment on PR review feedback | Approved | Exact reply/comment tool for the intended surface: `mcp_github_add_pull_request_review_comment_to_pending_review` for pending reviews, or `mcp_github_pull_request_review_write` with method `create` for new reviews. Do not use `mcp_github_add_issue_comment` for PR review feedback. | Pushed-visible changes or verified no-change rationale; real PR/comment/thread IDs; the verified no-change rationale must cite a specific spec, non-goal, file:line, or reviewer SHA (see Glossary) |
-| Submit pending pull request review | Approved | `mcp_github_pull_request_review_write` with method `submit_pending_pull_request_review` (or the host MCP server's documented submit-pending-review method); the submission `event` parameter is `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`. Do not substitute the issue-comment tool. | Pushed-visible changes; the review body and any inline pending comments must already satisfy the Externally-Posted Content Gate; real PR ID and pending-review ID; explicit operator approval when the submitted event is `APPROVE` |
-| Delete pending pull request review | Approved | The host MCP server's documented delete-pending-review method on `mcp_github_pull_request_review_write` (or equivalent) | Real PR ID and pending-review ID; used only to abandon a pending review whose composed content was rejected by gates or by the operator |
+| Resolve or unresolve review thread via MCP | Approved | `mcp_github_pull_request_review_write` with method `resolve_thread` or `unresolve_thread` only | Real review thread node ID from extension/GitHub data; pushed-visible addressed state or verified no-change rationale; gatekeeper pass or allowed skip; no mutating probe |
+| Resolve review thread via VS Code PR extension | Approved | `github.vscode-pull-request-github/resolveReviewThread` only | Real review thread node ID from extension/GitHub data; pushed-visible addressed state or verified no-change rationale; gatekeeper pass or allowed skip; no mutating probe |
+| Reply/comment on PR review feedback | Approved | Exact reply/comment tool for the intended surface: `mcp_github_add_pull_request_review_comment_to_pending_review` for pending reviews, or `mcp_github_pull_request_review_write` with method `create` for new reviews. Do not use `mcp_github_add_issue_comment` for PR review feedback. | Pushed-visible changes or verified no-change rationale; real PR/comment/thread IDs; pending-review inline comments are staged only and are not posted evidence until submit-pending-review succeeds and visibility is confirmed; the verified no-change rationale must cite a specific spec, non-goal, file:line, or reviewer SHA (see Glossary) |
+| Submit pending pull request review | Approved | `mcp_github_pull_request_review_write` with method `submit_pending_pull_request_review` (or the host MCP server's documented submit-pending-review method); the submission `event` parameter is `COMMENT`, `APPROVE`, or `REQUEST_CHANGES`. Do not substitute the issue-comment tool. | Pushed-visible changes; the review body and any inline pending comments must already satisfy the Externally-Posted Content Gate; real PR ID and pending-review ID; explicit operator approval when the submitted event is `APPROVE`; success must be confirmed before pending-review comments count as posted evidence |
+| Delete pending pull request review | Approved | The host MCP server's documented delete-pending-review method on `mcp_github_pull_request_review_write` (or equivalent) | Real PR ID and pending-review ID; used only to abandon a pending review whose composed content was rejected by gates or by the operator, or whose submission failed or cannot be confirmed |
 | Merge pull request | Blocked | None approved | Future workflow required |
 | Update PR title/body/base/head | Blocked | None approved | Future workflow required |
 | Update branch | Blocked | None approved | Future workflow required |
@@ -171,6 +182,8 @@ Only the following GitHub remote mutations are approved by this pack, and only a
 Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling.
 
 If the exact approved GitHub tool or required real IDs are missing, unavailable, ambiguous, or fail before completing the intended action, stop and provide guidance instead of trying a substitute mutation.
+
+Pending-review lifecycle rule: staging pending-review inline comments is not a posted reviewer-facing reply and does not satisfy reply-before-resolve evidence. If pending-review content fails the Externally-Posted Content Gate, do not submit it; delete or abandon any pending review that already contains rejected content before any thread resolution. If submit-pending-review fails or its GitHub-visible result is unconfirmed, block resolution and report the failed or unconfirmed submission separately from reply creation; never classify that path as `reply+resolve`.
 
 ## Linear Remote Mutation Allowlist
 
@@ -422,6 +435,7 @@ Before replying to PR review comments as addressed or resolving threads:
 - Replies, review status mutations, and thread resolution require real PR/review critical parameters from GitHub data.
 - Thread resolution or unresolution requires the actual GitHub review thread node ID. A comment URL, file path, line number, review comment ID, inferred value, placeholder, or `dummy` value is not a valid substitute.
 - If the actual review thread node ID is unavailable, report resolution blocked instead of attempting `resolve_thread`/`unresolve_thread` or claiming resolution.
+- `github.vscode-pull-request-github/resolveReviewThread` is approved only for review-thread resolution with a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
 
 ## Handoff Log Hygiene
 
