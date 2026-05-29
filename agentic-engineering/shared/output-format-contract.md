@@ -36,7 +36,7 @@ Use this package when a workflow reports the `Broad Safe Validation Gate`.
   - Name the candidate command(s) inspected from repository-local evidence, or state that no candidate was found.
 - Selected or unavailable command conclusion
   - Name the selected broad safe validation command, or explain why no command was selectable under the workflow boundaries.
-- Repository-local evidence
+- Repository-local discovery evidence
   - Name the checked-in docs, scripts, task definitions, tool configuration, or prior local inspection used for discovery.
 - Command classification basis
   - Explain the behavior-based classification, including whether the command is local-only, approval-bound, forbidden, unavailable, skipped, not applicable, or mutating-only.
@@ -69,7 +69,7 @@ Use this package when a workflow reports `Pre-push adversarial review status`.
   - Report whether a skip was considered, why it was rejected, or why it was accepted.
 - Blocking findings count
   - Use a non-negative integer.
-- Dedup basis
+- Dedup applied against
   - Name the prior finding sources or state none/not applicable.
 
 ### PR Template and Body Status

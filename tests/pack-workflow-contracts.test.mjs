@@ -432,7 +432,8 @@ test('shared output format contract owns reusable validation and PR status packa
     assert.match(text, /`passed`, `failed`, `blocked`, `skipped`, `not applicable`, or `mutating-only`/);
     assert.match(text, /Candidate commands inspected/);
     assert.match(text, /Selected or unavailable command conclusion/);
-    assert.match(text, /Repository-local evidence/);
+    assert.match(text, /Repository-local discovery evidence/);
+    assert.doesNotMatch(text, /Repository-local evidence/);
     assert.match(text, /Command classification basis/);
     assert.match(text, /Dirty-state boundary/);
     assert.match(text, /Freshness for final candidate worktree\/fix batch/);
@@ -448,7 +449,8 @@ test('shared output format contract owns reusable validation and PR status packa
     assert.match(text, /Matched non-trivial class\(es\)/);
     assert.match(text, /Skip considered\/rejected\/accepted evidence/);
     assert.match(text, /Blocking findings count/);
-    assert.match(text, /Dedup basis/);
+    assert.match(text, /Dedup applied against/);
+    assert.doesNotMatch(text, /Dedup basis/);
 
     assert.match(text, /Gate decision/);
     assert.match(text, /`pass`, `fail`, or `BLOCK`/);
@@ -836,7 +838,7 @@ test('PR review Broad Safe Validation Gate blocks failed or blocked broad valida
     assert.match(combined, /A valid `skipped` or `not applicable` status may proceed only when the output names inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
     assert.match(coordinator, /Broad Safe Validation Gate: use the shared Broad Safe Validation Gate evidence package/);
     assert.match(outputContract, /Broad safe validation status[\s\S]+`passed`, `failed`, `blocked`, `skipped`, `not applicable`, or `mutating-only`/);
-    assert.match(outputContract, /Candidate commands inspected[\s\S]+Selected or unavailable command conclusion[\s\S]+Repository-local evidence[\s\S]+Command classification basis[\s\S]+Dirty-state boundary[\s\S]+Freshness for final candidate worktree\/fix batch[\s\S]+Proceed\/block effect[\s\S]+Residual risk[\s\S]+Next action/);
+    assert.match(outputContract, /Candidate commands inspected[\s\S]+Selected or unavailable command conclusion[\s\S]+Repository-local discovery evidence[\s\S]+Command classification basis[\s\S]+Dirty-state boundary[\s\S]+Freshness for final candidate worktree\/fix batch[\s\S]+Proceed\/block effect[\s\S]+Residual risk[\s\S]+Next action/);
 });
 
 test('PR review status definitions require freshness for non-passing broad validation outcomes', async () => {
