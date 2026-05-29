@@ -14,7 +14,7 @@ Prepare the `review-cycle-gatekeeper` handoff after PR review fixes are pushed-v
 - Pushed-visible status: commits are local, pushed to the PR branch, and reflected in the PR diff.
 - Fix commits tied to validated comments or reviewer findings.
 - Targeted verification evidence for each addressed comment.
-- Broad Safe Validation Gate evidence, including freshness state for the final candidate worktree/fix batch.
+- Broad Safe Validation Gate evidence, including freshness evidence for the final candidate worktree/fix batch.
 - PR head SHA from fresh PR data after push visibility.
 - Fresh unresolved/reopened review-thread snapshot from `pr-review-thread-context`.
 - Reconciled findings from contextual/independent review or integrator arbitration when those ran.

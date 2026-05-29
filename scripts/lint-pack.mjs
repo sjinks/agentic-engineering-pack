@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Lint the .github/ agentic engineering pack for known regression classes.
+ * Lint the agentic engineering pack for known regression classes.
  *
  * Five checks:
  *  1. Stale numbered cross-references — flags `Gate Rule N` references in
@@ -24,7 +24,8 @@
  *     `architect-agent` when referenced verbatim across the pack.
  *
  * Read-only: never writes files, never invokes git, never spawns external
- * processes. Walks only `.github/skills/`, `.github/agents/`, `.github/prompts/`.
+ * processes. Walks only `.github/skills/`, `.github/agents/`, `.github/prompts/`,
+ * and `agentic-engineering/shared/`.
  *
  * Usage:
  *   node scripts/lint-pack.mjs            # run all checks, exit 1 on any error
@@ -36,7 +37,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PACK_DIRS = ['.github/skills', '.github/agents', '.github/prompts'];
+const PACK_DIRS = ['.github/skills', '.github/agents', '.github/prompts', 'agentic-engineering/shared'];
 const SKILLS_DIR = '.github/skills';
 const AGENTS_DIR = '.github/agents';
 
@@ -64,7 +65,7 @@ const REFERENCE_WHITELIST = new Set([
 ]);
 
 function printHelp() {
-    console.log(`Lint the .github/ agentic engineering pack for known regression classes.
+    console.log(`Lint the agentic engineering pack for known regression classes.
 
 Usage:
   node scripts/lint-pack.mjs [options]

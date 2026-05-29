@@ -98,9 +98,31 @@ test('walkMarkdownFiles skips missing markdown roots', async () => {
         const result = await walkMarkdownFiles(tempRoot);
 
         assert.deepEqual(result.scannedRoots, ['.github/agents']);
-        assert.deepEqual(result.skippedRoots.sort(), ['.github/prompts', '.github/skills']);
+        assert.deepEqual(result.skippedRoots.sort(), ['.github/prompts', '.github/skills', 'agentic-engineering/shared']);
         assert.equal(result.files.length, 1);
         assert.equal(result.files[0].rel, '.github/agents/sample.agent.md');
+    }
+    finally {
+        await rm(tempRoot, { recursive: true, force: true });
+    }
+});
+
+test('walkMarkdownFiles scans markdown files from agentic-engineering/shared', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'lint-pack-shared-'));
+
+    try {
+        await mkdir(join(tempRoot, 'agentic-engineering', 'shared'), { recursive: true });
+        await writeFile(
+            join(tempRoot, 'agentic-engineering', 'shared', 'output-format-contract.md'),
+            '# Output Format Contract\n',
+            'utf8',
+        );
+
+        const result = await walkMarkdownFiles(tempRoot);
+
+        assert.deepEqual(result.scannedRoots, ['agentic-engineering/shared']);
+        assert.equal(result.files.length, 1);
+        assert.equal(result.files[0].rel, 'agentic-engineering/shared/output-format-contract.md');
     }
     finally {
         await rm(tempRoot, { recursive: true, force: true });
