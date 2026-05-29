@@ -176,6 +176,8 @@ An issue is valid and actionable if:
 
 ## Output Format
 
+Shared output fields are defined in `agentic-engineering/shared/output-format-contract.md`; this section lists workflow-specific and required fields for Linear issue handling.
+
 Return:
 - **Linear issue:** Issue key, title, description, status, priority, labels, team/project, assignee, and any git branch name.
 - **Handoff log/status:** Visible handoffs emitted for skill and agent delegation, plus any blocked handoffs.

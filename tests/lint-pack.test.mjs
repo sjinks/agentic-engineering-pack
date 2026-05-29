@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -8,6 +11,7 @@ import {
     checkOrchestratorSpecGateAnchors,
     stripHtmlCommentLine,
     stripHtmlCommentsFromLines,
+    walkMarkdownFiles,
 } from '../scripts/lint-pack.mjs';
 
 const longBody = 'This anchor has enough visible body content to satisfy the linter body measurement check.';
@@ -82,4 +86,42 @@ test('HTML comment state ignores comment openers inside fenced code blocks', () 
     lines.unshift('```', '<!-- not a real markdown comment for this check', '```');
 
     assert.equal(check(lines).length, 0);
+});
+
+test('walkMarkdownFiles skips missing markdown roots', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'lint-pack-roots-'));
+
+    try {
+        await mkdir(join(tempRoot, '.github', 'agents'), { recursive: true });
+        await writeFile(join(tempRoot, '.github', 'agents', 'sample.agent.md'), '# sample\n', 'utf8');
+
+        const result = await walkMarkdownFiles(tempRoot);
+
+        assert.deepEqual(result.scannedRoots, ['.github/agents']);
+        assert.deepEqual(result.skippedRoots.sort(), ['.github/prompts', '.github/skills']);
+        assert.equal(result.files.length, 1);
+        assert.equal(result.files[0].rel, '.github/agents/sample.agent.md');
+    }
+    finally {
+        await rm(tempRoot, { recursive: true, force: true });
+    }
+});
+
+test('walkMarkdownFiles throws explicit error when an existing markdown root cannot be traversed', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'lint-pack-roots-'));
+    const skillsRoot = join(tempRoot, '.github', 'skills');
+
+    try {
+        await mkdir(skillsRoot, { recursive: true });
+        await chmod(skillsRoot, 0o000);
+
+        await assert.rejects(
+            walkMarkdownFiles(tempRoot),
+            /Failed to traverse markdown root .*\.github\/skills:/,
+        );
+    }
+    finally {
+        await chmod(skillsRoot, 0o755).catch(() => {});
+        await rm(tempRoot, { recursive: true, force: true });
+    }
 });

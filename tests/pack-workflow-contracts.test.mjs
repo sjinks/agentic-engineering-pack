@@ -12,6 +12,7 @@ const linearSkillPath = '.github/skills/linear-issue-workflow/SKILL.md';
 const linearPromptPath = '.github/prompts/run-linear-issue-workflow.prompt.md';
 const docsPath = 'agentic-engineering/docs/README.md';
 const rootReadmePath = 'README.md';
+const outputFormatContractPath = 'agentic-engineering/shared/output-format-contract.md';
 const prReviewSkillPath = '.github/skills/pr-review-comments-workflow/SKILL.md';
 const prReviewThreadContextPath = '.github/skills/pr-review-thread-context/SKILL.md';
 const prReviewCommentValidationPath = '.github/skills/pr-review-comment-validation/SKILL.md';
@@ -309,6 +310,26 @@ test('pack guide contract uses the real source guide path and documents broad va
     assert.doesNotMatch(flowchart, /Fetch PR & Comments<br\/>github\/\*/);
 });
 
+test('shared output format contract exists with reusable core fields', async () => {
+    assert.equal(await exists(outputFormatContractPath), true, `${outputFormatContractPath} exists`);
+
+    const text = await read(outputFormatContractPath);
+
+    assert.match(text, /# Shared Output Format Contract/);
+    assert.match(text, /## Core Shared Fields/);
+    assert.match(text, /Handoff log\/status/);
+    assert.match(text, /Verification/);
+    assert.match(text, /Blockers/);
+    assert.match(text, /Residual risks/);
+});
+
+test('linear workflow output format references shared output format contract', async () => {
+    const text = await read(linearSkillPath);
+    const outputFormatSection = sliceBetween(text, '## Output Format', '## Linear Comment Audience and Content');
+
+    assert.match(outputFormatSection, /agentic-engineering\/shared\/output-format-contract\.md/);
+});
+
 test('generated plugin includes real guide docs at the README guide link target', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'agentic-engineering-pack-'));
     const outputRoot = join(tempRoot, 'plugin');
@@ -334,11 +355,17 @@ test('generated plugin includes real guide docs at the README guide link target'
             assertGeneratedGuideLinksResolve(outputRoot, /^\.\.\/\.\.\/skills\//, 'skill'),
         ]);
 
+        const generatedOutputFormatContract = pathWithin(outputRoot, outputFormatContractPath);
+        const generatedLinearSkill = await read(pathWithin(outputRoot, 'skills/linear-issue-workflow/SKILL.md'));
+
         assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\.github\/agents\//, 'source guide keeps repository-relative agent links');
         assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\.github\/skills\//, 'source guide keeps repository-relative skill links');
         assert.doesNotMatch(generatedGuide, /\]\(\.\.\/\.\.\/\.github\/(agents|skills|prompts)\//, 'generated guide does not link to repository .github surfaces');
         assert.ok(generatedAgentLinks.length > 0, 'generated guide has package-local agent links');
         assert.ok(generatedSkillLinks.length > 0, 'generated guide has package-local skill links');
+        assert.equal(await exists(generatedOutputFormatContract), true, 'generated package includes shared output format contract');
+        assert.match(generatedLinearSkill, /agentic-engineering\/shared\/output-format-contract\.md/, 'generated linear skill references shared output format contract path');
+        assert.equal(await exists(pathWithin(outputRoot, outputFormatContractPath)), true, 'generated shared output format contract reference resolves');
 
         const generatedCommandLinks = markdownLinkTargets(generatedGuide).filter((target) => /^\.\.\/\.\.\/commands\//.test(target));
         for (const target of generatedCommandLinks) {

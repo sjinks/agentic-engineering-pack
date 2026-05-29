@@ -6,6 +6,22 @@ This workspace contains a v1 AI orchestration customization pack for VS Code and
 
 For a comprehensive overview of the pack, including component descriptions, workflow diagrams, handoff contracts, gates, and failure modes this design prevents, see [agentic-engineering/docs/README.md](agentic-engineering/docs/README.md). This guide contains Mermaid diagrams showing orchestration flows, Linear issue workflows, PR review comment workflows, review arbitration, and commit/PR finalization steps.
 
+## Quick Start
+
+```bash
+# 1) Generate installable plugin bundle
+node scripts/generate-copilot-plugin.mjs --clean
+
+# 2) Lint pack contracts
+node scripts/lint-pack.mjs
+
+# 3) Run workflow contract tests
+node --test tests/lint-pack.test.mjs tests/pack-workflow-contracts.test.mjs
+
+# 4) Install plugin bundle
+copilot plugin install ./dist/agentic-engineering-pack
+```
+
 ## Generate an Installable Copilot Plugin
 
 Use the generator to create an installable Copilot plugin directory.
