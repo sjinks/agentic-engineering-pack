@@ -568,6 +568,21 @@ test('linear workflow output format references shared output format contract', a
     assert.match(outputFormatSection, /agentic-engineering\/shared\/output-format-contract\.md/);
 });
 
+test('PR description output format references shared output contract while preserving local output fields', async () => {
+    const text = await read(pullRequestDescriptionPath);
+    const outputFormatSection = sliceFrom(text, '## Output Format', 'PR description output format section');
+
+    assert.match(outputFormatSection, /agentic-engineering\/shared\/output-format-contract\.md/);
+    assert.match(outputFormatSection, /shared core fields and PR Template\/Body status vocabulary/);
+    assert.match(outputFormatSection, /PR description markdown in a fenced `markdown` code block only for the copy\/pasteable body/);
+    assert.match(outputFormatSection, /PR title in a separate fenced `text` code block when the user requested a title/);
+    assert.match(outputFormatSection, /Then notes outside the code block/);
+    assert.match(outputFormatSection, /Update status must say copy\/paste only/);
+    assert.match(outputFormatSection, /remote PR title\/body updates are not currently approved by `workflow-safety-gates`/);
+    assert.match(outputFormatSection, /PR template status and PR Body Audit Gate status use the shared PR Template\/Body status vocabulary/);
+    assert.match(outputFormatSection, /remain operator-facing notes/);
+});
+
 test('workflow-safety-gates policy reference extraction detects drift across the whole marker line', () => {
     const canonicalNames = new Set([
         'PR Body Audit Gate',
