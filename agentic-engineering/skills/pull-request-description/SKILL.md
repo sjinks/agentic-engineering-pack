@@ -95,7 +95,8 @@ If the workflow has no audience-relevant content for a templated section (for ex
 - If either support skill is unavailable or reports blocked, return blocked status and operator-facing notes instead of emitting a final fenced PR body.
 
 ## Output Format
+- Use `agentic-engineering/shared/output-format-contract.md` for shared core fields and PR Template/Body status vocabulary. Keep PR-description-specific fields local in this section.
 - PR description markdown in a fenced `markdown` code block only for the copy/pasteable body.
 - PR title in a separate fenced `text` code block when the user requested a title, in Conventional Commit subject style. The title block is separate from the PR body block and is not inserted into the body.
-- Then notes outside the code block: source commits/range, validation used, PR template status, omissions or warnings, and update status.
+- Then notes outside the code block: source commits/range, validation used, PR template status, PR Body Audit Gate status, omissions or warnings, and update status. PR template status and PR Body Audit Gate status use the shared PR Template/Body status vocabulary and remain operator-facing notes.
 - Update status must say copy/paste only. If the user requested an existing PR update, state blocked because remote PR title/body updates are not currently approved by `workflow-safety-gates` unless a future exact PR-body-update workflow is added.
