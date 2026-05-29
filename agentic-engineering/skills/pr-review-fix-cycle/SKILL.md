@@ -40,24 +40,24 @@ Status handling:
 - `passed`: the selected broad safe validation completed successfully, dirty-state boundaries remained acceptable, and the evidence is fresh for the final candidate worktree/fix batch.
 - `failed`: the selected broad safe validation ran and failed. This blocks push, reviewer-facing replies, and thread resolution until the selected broad safe validation failure is addressed, or until the workflow is re-scoped or reclassified so that command is no longer the selected broad safe validation. A failed selected broad safe validation cannot be waived through residual risk.
 - `blocked`: broad safe validation should run but cannot be selected or executed under current policy, tooling, dirty-state, or command-boundary constraints. This blocks push, reviewer-facing replies, and thread resolution.
-- `skipped`: broad safe validation is available but intentionally skipped only with inspected evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. A skip is valid only when the workflow policy accepts the residual risk for this changed surface.
-- `not applicable`: no meaningful broad validation exists for the changed surface after repository-local inspection. This may proceed only with inspected evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action.
+- `skipped`: broad safe validation is available but intentionally skipped only with repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. A skip is valid only when the workflow policy accepts the residual risk for this changed surface.
+- `not applicable`: no meaningful broad validation exists for the changed surface after repository-local inspection. This may proceed only with repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action.
 - `mutating-only`: only mutating, network, service-starting, package-management, or output-writing candidates exist. This is not a pass. It may proceed only with freshness evidence for the final candidate worktree/fix batch and after either the authorized mutating/output-writing candidate actually ran and is reported separately with dirty-state/output boundaries, or an accepted residual-risk rationale explicitly covers not running it.
 
 Operator-facing evidence must include:
 
 - Targeted verification status and commands/evidence.
 - Broad safe validation status using the vocabulary above.
-- Candidate command(s) inspected, the selected command or unavailable-command conclusion, and repository-local evidence used for discovery.
-- Classification basis for command-behavior outcomes (`local-only`, `approval-bound`, or `forbidden`) and status outcomes (`skipped`, `not applicable`, `blocked`, or `mutating-only`).
-- Dirty-state boundary evidence before/after any executed broad validation, when execution occurred.
+- Repository-local discovery evidence, candidate command(s) inspected, and selected command or unavailable-command conclusion.
+- Command classification basis for command-behavior outcomes (`local-only`, `approval-bound`, or `forbidden`) and status outcomes (`skipped`, `not applicable`, `blocked`, or `mutating-only`).
+- dirty-state boundary result when executed, including before/after evidence for any executed broad validation.
 - Freshness evidence for the final candidate worktree/fix batch, including whether later edits occurred and how broad validation was rerun or re-established after them.
 - Proceed/block effect, residual risk, and next operator action.
 
 ## Hard Gate
 
 - If the Broad Safe Validation Gate is missing, failed, blocked, stale, or not fresh for the final candidate worktree/fix batch, do not push, do not post reviewer-facing replies, and do not resolve threads.
-- A valid `skipped` or `not applicable` status may proceed only when the output names inspected evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action.
+- A valid `skipped` or `not applicable` status may proceed only when the output names repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action.
 - `mutating-only` is not a pass; proceed only after the authorized mutating/output-writing command ran and is reported separately with dirty-state/output boundaries, or after an accepted residual-risk rationale explicitly covers not running it.
 
 ## Commit and Push Contract
@@ -85,6 +85,6 @@ Return:
 - Broad Safe Validation Gate evidence package.
 - Equivalence-class audit report when applicable.
 - Commit readiness: commit-hygiene, Conventional Commit subject, and commit body status.
-- Pre-push adversarial review status received from the orchestrator: Execution status, Verdict, cumulative branch diff vs integration branch baseline, matched non-trivial classes, skip considered/rejected/accepted evidence, and blocking findings count.
+- Pre-push adversarial review status received from the orchestrator: use the shared Pre-push Adversarial Review Status package from `agentic-engineering/shared/output-format-contract.md`.
 - Commit/push status and pushed-visible confirmation.
 - Blockers and local-only status when push/readiness cannot proceed.

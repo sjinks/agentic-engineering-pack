@@ -28,27 +28,27 @@ This document defines reusable output fields shared across workflow reports. Wor
 
 Use this package when a workflow reports the `Broad Safe Validation Gate`.
 
-- Targeted verification status
+- targeted verification status
   - State whether targeted verification passed, failed, was blocked, was skipped, or was not applicable, and include the evidence or rationale.
-- Broad safe validation status
+- broad safe validation status
   - Use one of: `passed`, `failed`, `blocked`, `skipped`, `not applicable`, or `mutating-only`.
-- Candidate commands inspected
-  - Name the candidate command(s) inspected from repository-local evidence, or state that no candidate was found.
-- Selected or unavailable command conclusion
-  - Name the selected broad safe validation command, or explain why no command was selectable under the workflow boundaries.
-- Repository-local discovery evidence
+- repository-local discovery evidence
   - Name the checked-in docs, scripts, task definitions, tool configuration, or prior local inspection used for discovery.
-- Command classification basis
+- candidate command(s) inspected
+  - Name the candidate command(s) inspected from repository-local evidence, or state that no candidate was found.
+- selected command or unavailable-command conclusion
+  - Name the selected broad safe validation command, or explain why no command was selectable under the workflow boundaries.
+- command classification basis
   - Explain the behavior-based classification, including whether the command is local-only, approval-bound, forbidden, unavailable, skipped, not applicable, or mutating-only.
-- Dirty-state boundary
+- dirty-state boundary result when executed
   - When a command ran, report the before/after dirty-state or output boundary; when it did not run, state why.
-- Freshness for final candidate worktree/fix batch
+- freshness evidence for the final candidate worktree/fix batch
   - State whether evidence is fresh for the final candidate worktree/fix batch, stale, or unknown, and identify any later edit that changed freshness.
-- Proceed/block effect
+- proceed/block effect
   - State whether the gate permits the next workflow action or blocks it.
-- Residual risk
+- residual risk
   - Record accepted or remaining risk, especially for `skipped`, `not applicable`, or `mutating-only` outcomes.
-- Next action
+- next operator action
   - Name the next operator or workflow action needed.
 
 ### Pre-push Adversarial Review Status
