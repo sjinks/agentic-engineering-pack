@@ -217,6 +217,7 @@ async function workflowSafetyReferenceMarkdownPaths() {
     const directPaths = await existingPaths([rootReadmePath]);
     const roots = [
         'agentic-engineering/docs',
+        'agentic-engineering/shared',
         'docs/agentic',
         '.github/skills',
         '.github/agents',
@@ -1330,7 +1331,7 @@ test('workflow entrypoints propagate first-round non-trivial pre-push review sta
         assert.match(text, /First-round non-trivial pre-push adversarial-review/, `${path} names first-round rule`);
         assert.match(text, /Pre-push adversarial review status/, `${path} reports pre-push status`);
         assert.match(text, /Execution status.*Verdict|`Execution status`.*`Verdict`/s, `${path} keeps execution separate from verdict`);
-        assert.match(text, /Matched non-trivial class|matched non-trivial class/i, `${path} reports matched non-trivial classes`);
+        assert.match(text, /Matched non-trivial class\(es\)/, `${path} reports matched non-trivial classes`);
         assert.match(text, /Skip considered[\s\S]*Skip rejected evidence[\s\S]*Skip accepted evidence/, `${path} reports skip evidence with canonical labels`);
     }
 });
@@ -1343,6 +1344,7 @@ test('pre-push output and readiness contexts use canonical adversarial status la
         /skip considered\/rejected\/accepted evidence/i,
         /whether skip was considered, and skip rejected\/accepted evidence/i,
         /cumulative branch diff vs integration branch baseline/i,
+        /matched non-trivial class(?:\(es\)|es)/,
         /matched non-trivial classes/,
         /blocking findings count/,
     ];
