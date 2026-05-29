@@ -90,6 +90,105 @@ function assertPrTemplateStatuses(text, label) {
     }
 }
 
+function canonicalWorkflowSafetyPolicyNames(text) {
+    return new Set(
+        [...text.matchAll(/^#{2,3}\s+(.+?(?:Gate|Allowlist))\s*$/gm)]
+            .map((match) => match[1].trim()),
+    );
+}
+
+function annotateMarkdownCodeBlocks(lines) {
+    const inCodeBlock = new Array(lines.length).fill(false);
+    let fenced = false;
+
+    for (let index = 0; index < lines.length; index += 1) {
+        if (/^```/.test(lines[index])) {
+            fenced = !fenced;
+            inCodeBlock[index] = true;
+            continue;
+        }
+
+        inCodeBlock[index] = fenced;
+    }
+
+    return inCodeBlock;
+}
+
+const workflowSafetyMarker = '`workflow-safety-gates`';
+const workflowSafetyPolicyNamePattern = /\b((?:[A-Z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*|[A-Z]{2,})(?:\s+(?:[A-Z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*|[A-Z]{2,}))*\s+(?:Gate|Allowlist))\b/g;
+
+function workflowSafetyPolicyNameCandidates(text) {
+    return [...text.matchAll(workflowSafetyPolicyNamePattern)].map((match) => match[1]);
+}
+
+function isClearWorkflowSafetyGlossaryOnlyLine(line, markerIndex) {
+    const beforeMarker = line.slice(0, markerIndex);
+    const afterMarker = line.slice(markerIndex + workflowSafetyMarker.length).trimStart();
+
+    return /^Glossary\b/.test(afterMarker) && workflowSafetyPolicyNameCandidates(beforeMarker).length === 0;
+}
+
+function workflowSafetyPolicyReferenceCandidates(text) {
+    const lines = text.split(/\r?\n/);
+    const inCodeBlock = annotateMarkdownCodeBlocks(lines);
+    const candidates = [];
+
+    for (let index = 0; index < lines.length; index += 1) {
+        const markerIndex = lines[index].indexOf(workflowSafetyMarker);
+
+        if (inCodeBlock[index] || markerIndex < 0 || isClearWorkflowSafetyGlossaryOnlyLine(lines[index], markerIndex)) {
+            continue;
+        }
+
+        for (const name of workflowSafetyPolicyNameCandidates(lines[index])) {
+            candidates.push({ line: index + 1, name });
+        }
+    }
+
+    return candidates;
+}
+
+function unresolvedWorkflowSafetyPolicyReferences(path, text, canonicalNames) {
+    return workflowSafetyPolicyReferenceCandidates(text)
+        .filter((candidate) => !canonicalNames.has(candidate.name))
+        .map((candidate) => ({ path, ...candidate }));
+}
+
+async function markdownPathsUnder(root) {
+    const paths = [];
+
+    if (!(await exists(root))) {
+        return paths;
+    }
+
+    const entries = await collectTree(root);
+    for (const [relativePath, type] of entries) {
+        if (type === 'file' && relativePath.endsWith('.md')) {
+            paths.push(`${root}/${relativePath}`);
+        }
+    }
+
+    return paths;
+}
+
+async function workflowSafetyReferenceMarkdownPaths() {
+    const directPaths = await existingPaths([rootReadmePath]);
+    const roots = [
+        'agentic-engineering/docs',
+        'docs/agentic',
+        '.github/skills',
+        '.github/agents',
+        '.github/prompts',
+    ];
+    const paths = [...directPaths];
+
+    for (const root of roots) {
+        paths.push(...await markdownPathsUnder(root));
+    }
+
+    return [...new Set(paths)].sort();
+}
+
 function markdownLinkTargets(markdown) {
     return [...markdown.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g)].map((match) => match[1]);
 }
@@ -321,6 +420,57 @@ test('shared output format contract exists with reusable core fields', async () 
     assert.match(text, /Verification/);
     assert.match(text, /Blockers/);
     assert.match(text, /Residual risks/);
+    assert.match(text, /Follow-up/);
+});
+
+test('shared output format contract owns reusable validation and PR status packages', async () => {
+    const text = await read(outputFormatContractPath);
+
+    assert.match(text, /### Broad Safe Validation Gate Evidence/);
+    assert.match(text, /Targeted verification status/);
+    assert.match(text, /Broad safe validation status/);
+    assert.match(text, /`passed`, `failed`, `blocked`, `skipped`, `not applicable`, or `mutating-only`/);
+    assert.match(text, /Candidate commands inspected/);
+    assert.match(text, /Selected or unavailable command conclusion/);
+    assert.match(text, /Repository-local evidence/);
+    assert.match(text, /Command classification basis/);
+    assert.match(text, /Dirty-state boundary/);
+    assert.match(text, /Freshness for final candidate worktree\/fix batch/);
+    assert.match(text, /Proceed\/block effect/);
+    assert.match(text, /Residual risk/);
+    assert.match(text, /Next action/);
+
+    assert.match(text, /### Pre-push Adversarial Review Status/);
+    assert.match(text, /Execution status/);
+    assert.match(text, /Verdict/);
+    assert.match(text, /Trigger basis/);
+    assert.match(text, /Diff baseline/);
+    assert.match(text, /Matched non-trivial class\(es\)/);
+    assert.match(text, /Skip considered\/rejected\/accepted evidence/);
+    assert.match(text, /Blocking findings count/);
+    assert.match(text, /Dedup basis/);
+
+    assert.match(text, /Gate decision/);
+    assert.match(text, /`pass`, `fail`, or `BLOCK`/);
+    assertPrTemplateStatuses(text, 'shared PR template status package');
+    assert.match(text, /PR Body Audit Gate status/);
+    assert.match(text, /`pass`, `repaired`, `blocked`, or `not applicable`/);
+});
+
+test('PR review workflow output format references shared output format contract', async () => {
+    const text = await read(prReviewSkillPath);
+    const outputFormatSection = sliceFrom(text, '## Output Format', 'PR review output format section');
+
+    assert.match(outputFormatSection, /agentic-engineering\/shared\/output-format-contract\.md/);
+    assert.match(outputFormatSection, /Broad Safe Validation Gate: use the shared Broad Safe Validation Gate evidence package/);
+    assert.match(outputFormatSection, /Pre-push adversarial review status[\s\S]+use the shared Pre-push adversarial review status package/);
+    assert.match(outputFormatSection, /Execution status/);
+    assert.match(outputFormatSection, /Verdict/);
+    assert.match(outputFormatSection, /Matched non-trivial class\(es\)/);
+    assert.match(outputFormatSection, /Skip considered/);
+    assert.match(outputFormatSection, /Skip rejected/);
+    assert.match(outputFormatSection, /Skip accepted/);
+    assert.doesNotMatch(outputFormatSection, /Broad Safe Validation Gate: targeted verification status; broad safe validation status/);
 });
 
 test('linear workflow output format references shared output format contract', async () => {
@@ -328,6 +478,60 @@ test('linear workflow output format references shared output format contract', a
     const outputFormatSection = sliceBetween(text, '## Output Format', '## Linear Comment Audience and Content');
 
     assert.match(outputFormatSection, /agentic-engineering\/shared\/output-format-contract\.md/);
+});
+
+test('workflow-safety-gates policy reference extraction detects drift across the whole marker line', () => {
+    const canonicalNames = new Set([
+        'PR Body Audit Gate',
+        'Remote MCP Context Gate',
+    ]);
+    const text = [
+        '- Apply the PR Body Audit Gate from `workflow-safety-gates` before PR body publication.',
+        '- Apply `workflow-safety-gates` Remote MCP Context Gate before remote context reads.',
+        '- See the `workflow-safety-gates` Glossary Imaginary Drift Gate entry for terminology only.',
+        '- Apply the PR Boddy Audit Gate from `workflow-safety-gates` before PR body publication.',
+    ].join('\n');
+
+    assert.deepEqual(workflowSafetyPolicyReferenceCandidates(text), [
+        { line: 1, name: 'PR Body Audit Gate' },
+        { line: 2, name: 'Remote MCP Context Gate' },
+        { line: 4, name: 'PR Boddy Audit Gate' },
+    ]);
+    assert.deepEqual(unresolvedWorkflowSafetyPolicyReferences('synthetic.md', text, canonicalNames), [
+        { path: 'synthetic.md', line: 4, name: 'PR Boddy Audit Gate' },
+    ]);
+});
+
+test('workflow-safety-gates policy references resolve to canonical Gate and Allowlist headings', async () => {
+    const safety = await read(workflowSafetyGatesPath);
+    const canonicalNames = canonicalWorkflowSafetyPolicyNames(safety);
+    const checked = [];
+    const unresolved = [];
+
+    assert.ok(canonicalNames.size > 0, 'workflow-safety-gates exposes canonical Gate/Allowlist headings');
+
+    for (const path of await workflowSafetyReferenceMarkdownPaths()) {
+        if (path === workflowSafetyGatesPath) {
+            continue;
+        }
+
+        const text = await read(path);
+        for (const candidate of workflowSafetyPolicyReferenceCandidates(text)) {
+            const reference = { path, ...candidate };
+
+            checked.push(reference);
+            if (!canonicalNames.has(candidate.name)) {
+                unresolved.push(reference);
+            }
+        }
+    }
+
+    assert.deepEqual(
+        unresolved,
+        [],
+        unresolved.map((reference) => `${reference.path}:${reference.line} references workflow-safety-gates policy "${reference.name}" but no matching Gate/Allowlist heading exists`).join('\n'),
+    );
+    assert.ok(checked.length > 0, 'operator-facing markdown contains workflow-safety-gates Gate/Allowlist references');
 });
 
 test('generated plugin includes real guide docs at the README guide link target', async () => {
@@ -593,6 +797,7 @@ test('PR review Broad Safe Validation Gate is repository-agnostic and separates 
 test('PR review Broad Safe Validation Gate requires fresh final-worktree evidence before readiness', async () => {
     const coordinator = await read(prReviewSkillPath);
     const text = await read(prReviewFixCyclePath);
+    const outputContract = await read(outputFormatContractPath);
     const workflow = sliceBetween(coordinator, '## Workflow', '## Review Comment Validation Gate', 'PR review workflow freshness section');
     const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate', 'PR review fix-cycle freshness section');
     const hardGate = `${coordinator}\n${text}`;
@@ -606,12 +811,14 @@ test('PR review Broad Safe Validation Gate requires fresh final-worktree evidenc
     assert.match(section, /Later edits invalidate prior broad validation until it is rerun or explicitly re-established for the final changed surface/);
     assert.match(section, /`passed`: the selected broad safe validation completed successfully, dirty-state boundaries remained acceptable, and the evidence is fresh for the final candidate worktree\/fix batch/);
     assert.match(hardGate, /If the Broad Safe Validation Gate is missing, failed, blocked, stale, or not fresh for the final candidate worktree\/fix batch, do not push, do not post reviewer-facing replies, and do not resolve threads/);
-    assert.match(`${coordinator}\n${text}`, /Broad Safe Validation Gate: targeted verification status; broad safe validation status[\s\S]+freshness evidence for the final candidate worktree\/fix batch[\s\S]+proceed\/block effect; residual risk; next operator action/);
+    assert.match(coordinator, /Broad Safe Validation Gate: use the shared Broad Safe Validation Gate evidence package/);
+    assert.match(outputContract, /Broad Safe Validation Gate Evidence[\s\S]+Targeted verification status[\s\S]+Freshness for final candidate worktree\/fix batch[\s\S]+Proceed\/block effect[\s\S]+Residual risk[\s\S]+Next action/);
 });
 
 test('PR review Broad Safe Validation Gate blocks failed or blocked broad validation and requires residual-risk reporting', async () => {
     const coordinator = await read(prReviewSkillPath);
     const text = await read(prReviewFixCyclePath);
+    const outputContract = await read(outputFormatContractPath);
     const combined = `${coordinator}\n${text}`;
     const section = sliceBetween(text, '## Broad Safe Validation Gate', '## Hard Gate', 'PR review fix-cycle blocking section');
     const failedStatus = section.match(/- `failed`:[^\n]+/)?.[0] ?? '';
@@ -627,7 +834,9 @@ test('PR review Broad Safe Validation Gate blocks failed or blocked broad valida
     assert.match(combined, /Classification basis for command-behavior outcomes \(`local-only`, `approval-bound`, or `forbidden`\) and status outcomes \(`skipped`, `not applicable`, `blocked`, or `mutating-only`\)/);
     assert.match(combined, /If the Broad Safe Validation Gate is missing, failed, blocked, stale, or not fresh for the final candidate worktree\/fix batch, do not push, do not post reviewer-facing replies, and do not resolve threads/);
     assert.match(combined, /A valid `skipped` or `not applicable` status may proceed only when the output names inspected evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
-    assert.match(combined, /Broad Safe Validation Gate: targeted verification status; broad safe validation status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\); candidate command\(s\) inspected; selected command or unavailable-command conclusion; repository-local discovery evidence; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action/);
+    assert.match(coordinator, /Broad Safe Validation Gate: use the shared Broad Safe Validation Gate evidence package/);
+    assert.match(outputContract, /Broad safe validation status[\s\S]+`passed`, `failed`, `blocked`, `skipped`, `not applicable`, or `mutating-only`/);
+    assert.match(outputContract, /Candidate commands inspected[\s\S]+Selected or unavailable command conclusion[\s\S]+Repository-local evidence[\s\S]+Command classification basis[\s\S]+Dirty-state boundary[\s\S]+Freshness for final candidate worktree\/fix batch[\s\S]+Proceed\/block effect[\s\S]+Residual risk[\s\S]+Next action/);
 });
 
 test('PR review status definitions require freshness for non-passing broad validation outcomes', async () => {

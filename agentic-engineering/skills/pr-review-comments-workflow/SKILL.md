@@ -107,13 +107,15 @@ The forbidden categories, positive rules, authorship-disclosure carve-out, and a
 
 ## Output Format
 
+Shared output fields and reusable evidence packages are defined in `agentic-engineering/shared/output-format-contract.md`; this section lists PR-review-specific fields and local routing notes.
+
 - PR.
 - Validation decisions and rationale for each comment.
 - Comments addressed.
 - Comments not addressed.
 - Files changed.
-- Verification.
-- Broad Safe Validation Gate: targeted verification status; broad safe validation status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`); candidate command(s) inspected; selected command or unavailable-command conclusion; repository-local discovery evidence; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree/fix batch; proceed/block effect; residual risk; next operator action.
+- Verification, including targeted fix evidence per addressed comment.
+- Broad Safe Validation Gate: use the shared Broad Safe Validation Gate evidence package, including targeted verification status and broad safe validation status.
 - Commit/push status.
 - PR visibility status.
 - Review replies/resolutions, including for each fix-backed or touched-file addressed thread the reply commit SHA and the posted one-line summary, and for each verified no-change, disagreement, or clarification thread the evidence citation/provenance used instead of a fix SHA. Include any threads that were intentionally not replied to or not resolved and the operator-facing reason. When the reply-then-resolve loop hit a per-thread failure, report counts and thread IDs for reply+resolve pairs completed, reply-only threads, and untouched threads. Operator-facing reasons stay in this output and are not posted as PR replies.
@@ -121,5 +123,6 @@ The forbidden categories, positive rules, authorship-disclosure carve-out, and a
 - Vault context status, when used, including provenance and read/not-read boundaries.
 - Blockers.
 - Gate decision (`pass`/`fail`/`BLOCK`) from `review-cycle-gatekeeper` and any blockers it reported, or explicit canonical sentinel `no fix cycle, gatekeeper skipped`.
-- Pre-push adversarial review status (received from the orchestrator handoff): `Round-N count` (integer >= 1 from the orchestrator's `pull_request_read method=get_reviews` read, or `unknown` with the `Round-N-metadata-unreadable sentinel` verbatim when metadata was unreadable per the `workflow-safety-gates` Glossary); `Trigger basis` (`first-round non-trivial`, `Round-N >= 2`, or `not applicable`); `Execution status` (one of `completed`, `skipped`, `blocked`, `not applicable`; name the responsible sentinel or risk-shape rationale when `blocked` or `skipped`); `Verdict` (one of `BLOCK`, `CONCERNS`, `CLEAN`, `defer to prior adversarial review`, or the literal `Verdict: not produced (execution status: <execution-status>)` when no adversary verdict exists for this push). Execution-status values are NEVER placed directly in the Verdict field; `Verdict: BLOCK` blocks push readiness even with `Execution status: completed`. Also include: `Diff baseline` (`cumulative branch diff vs integration branch` for first-round evaluation, or a later-push delta only after first-round coverage exists); `Matched non-trivial class(es)`; `Skip considered`; `Skip rejected evidence`; `Skip accepted evidence`; `Blocking findings count` (non-negative integer); `Dedup applied against`.
+- Pre-push adversarial review status (received from the orchestrator handoff): use the shared Pre-push adversarial review status package. Preserve `Execution status`, `Verdict`, `Matched non-trivial class(es)`, `Skip considered`, `Skip rejected`, and `Skip accepted` evidence locally; include Round-N count and any `Round-N-metadata-unreadable sentinel` under this status and Blockers when provided.
+- PR description status when a PR body refresh or update request was in scope.
 - Follow-up.
