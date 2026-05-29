@@ -425,6 +425,12 @@ test('shared output format contract exists with reusable core fields', async () 
 
 test('shared output format contract owns reusable validation and PR status packages', async () => {
     const text = await read(outputFormatContractPath);
+    const prePushSection = sliceBetween(
+        text,
+        '### Pre-push Adversarial Review Status',
+        '### PR Template and Body Status',
+        'shared pre-push adversarial review status package',
+    );
 
     assert.match(text, /### Broad Safe Validation Gate Evidence/);
     assert.match(text, /Targeted verification status/);
@@ -441,16 +447,32 @@ test('shared output format contract owns reusable validation and PR status packa
     assert.match(text, /Residual risk/);
     assert.match(text, /Next action/);
 
-    assert.match(text, /### Pre-push Adversarial Review Status/);
-    assert.match(text, /Execution status/);
-    assert.match(text, /Verdict/);
-    assert.match(text, /Trigger basis/);
-    assert.match(text, /Diff baseline/);
-    assert.match(text, /Matched non-trivial class\(es\)/);
-    assert.match(text, /Skip considered\/rejected\/accepted evidence/);
-    assert.match(text, /Blocking findings count/);
-    assert.match(text, /Dedup applied against/);
-    assert.doesNotMatch(text, /Dedup basis/);
+    assert.match(prePushSection, /### Pre-push Adversarial Review Status/);
+    assert.match(prePushSection, /Execution status/);
+    assert.match(prePushSection, /Verdict/);
+    assert.match(prePushSection, /Trigger basis/);
+    for (const triggerBasis of [
+        'first-round non-trivial',
+        'Round-N >= 2',
+        'synthesis non-trivial',
+        'operator-requested',
+        'New Shared Module invoke',
+        'not applicable',
+    ]) {
+        assert.match(prePushSection, new RegExp('`' + triggerBasis + '`'), `${triggerBasis} is included in pre-push trigger vocabulary`);
+    }
+    assert.doesNotMatch(prePushSection, /security-sensitive/);
+    assert.match(prePushSection, /Round-N count/);
+    assert.match(prePushSection, /Round-count source/);
+    assert.match(prePushSection, /Diff baseline/);
+    assert.match(prePushSection, /Matched non-trivial class\(es\)/);
+    assert.match(prePushSection, /Skip considered/);
+    assert.match(prePushSection, /Skip rejected evidence/);
+    assert.match(prePushSection, /Skip accepted evidence/);
+    assert.match(prePushSection, /Blocking findings count/);
+    assert.match(prePushSection, /Dedup applied against/);
+    assert.match(prePushSection, /Equiv-audit fired/);
+    assert.doesNotMatch(prePushSection, /Dedup basis/);
 
     assert.match(text, /Gate decision/);
     assert.match(text, /`pass`, `fail`, or `BLOCK`/);

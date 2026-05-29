@@ -60,17 +60,27 @@ Use this package when a workflow reports `Pre-push adversarial review status`.
 - Verdict
   - Use one of: `BLOCK`, `CONCERNS`, `CLEAN`, `defer to prior adversarial review`, or `Verdict: not produced (execution status: <execution-status>)` when no adversary verdict exists.
 - Trigger basis
-  - Name the trigger, such as first-round non-trivial, Round-N >= 2, operator-requested, security-sensitive, or not applicable.
+  - Use one of: `first-round non-trivial`, `Round-N >= 2`, `synthesis non-trivial`, `operator-requested`, `New Shared Module invoke`, or `not applicable`.
+- Round-N count
+  - Use an integer greater than or equal to 1, `not applicable`, or `unknown` with the Round-N metadata sentinel.
+- Round-count source
+  - Name the read source and returned count, or state `not applicable` before PR metadata exists.
 - Diff baseline
   - Name the baseline used for review, such as cumulative branch diff vs integration branch.
 - Matched non-trivial class(es)
   - List the risk-shape classes that made the diff non-trivial, or state none.
-- Skip considered/rejected/accepted evidence
-  - Report whether a skip was considered, why it was rejected, or why it was accepted.
+- Skip considered
+  - Use `yes` or `no`.
+- Skip rejected evidence
+  - State why non-trivial review won, or `None`.
+- Skip accepted evidence
+  - State the valid trivial skip class or rationale, or `None`.
 - Blocking findings count
   - Use a non-negative integer.
 - Dedup applied against
   - Name the prior finding sources or state none/not applicable.
+- Equiv-audit fired
+  - Use a boolean; when true, name the matched surfaces and any recorded operator override rationale.
 
 ### PR Template and Body Status
 
