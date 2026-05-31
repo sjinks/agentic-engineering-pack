@@ -2225,7 +2225,6 @@ test('PR review-write contract narrows resolve-only and prefers VS Code extensio
     // pr-creation-agent: handoff-sourced state, no self-inspection of remote/git
     assert.match(prCreationAgent, /This agent has no GitHub read or `execute` grants, so remote and git state are taken from the handoff rather than self-inspected\./);
     assert.match(prCreationAgent, /Confirm pushed-visible status from the orchestrator handoff \(distilled from github-context-agent reads\)/);
-    assert.match(prCreationAgent, /the `mcp_github_create_pull_request` tool's own error response is the fallback failure surface/);
     assert.doesNotMatch(prCreationAgent, /conflicts with current repository state/i);
     assert.doesNotMatch(prCreationAgent, /conflicts with current read-only repository state/i);
 
@@ -2262,6 +2261,118 @@ test('workflow-safety-gates describes three-specialist GitHub split', async () =
         const escapedGrant = grant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         assert.match(remoteMcpSection, new RegExp(escapedGrant, 'i'), `Remote MCP Context Gate mentions ${grant}`);
     }
+});
+
+test('pr-review-agent onward delegation re-applies orchestrator gates before builder/test handoff', async () => {
+    const content = await read(prReviewAgentPath);
+    const delegationSection = sliceBetween(
+        content,
+        '## Delegation to Implementation and Verification Specialists',
+        '## Hard Gates',
+        'pr-review-agent delegation section',
+    );
+    assert.match(
+        delegationSection,
+        /pr-review-fix-cycle.*Builder\/Test Contract/,
+        'pr-review-agent delegation section must reference pr-review-fix-cycle Builder/Test Contract',
+    );
+    assert.match(
+        delegationSection,
+        /spec status.*architecture status|Spec status.*Architecture status/,
+        'pr-review-agent delegation section must require spec status and architecture status carry-forward',
+    );
+    assert.match(
+        delegationSection,
+        /equivalence-class audit instruction/,
+        'pr-review-agent delegation section must require the equivalence-class audit instruction',
+    );
+    assert.match(
+        delegationSection,
+        /block the delegation and report/,
+        'pr-review-agent delegation section must require blocking the delegation when gate inputs are missing',
+    );
+    assert.match(
+        delegationSection,
+        /pre-push adversarial-review rule remain[s]? orchestrator-owned/,
+        'pr-review-agent delegation section must clarify pre-push adversarial review remains orchestrator-owned',
+    );
+
+    const hardGates = sliceBetween(content, '## Hard Gates', '## Approach', 'pr-review-agent Hard Gates section');
+    assert.match(
+        hardGates,
+        /Do not delegate review-driven fixes.*spec status.*architecture status.*equivalence-class audit instruction/s,
+        'pr-review-agent Hard Gates must include the gate-carry-forward enforcement',
+    );
+});
+
+test('workflow-safety-gates discloses github/pull_request_review_write tool-level residual risk', async () => {
+    const content = await read(workflowSafetyGatesPath);
+    const gateSection = sliceBetween(content, '## Remote MCP Context Gate', '## Obsidian Vault Context Gate', 'Remote MCP Context Gate section');
+    assert.match(
+        gateSection,
+        /`github\/pull_request_review_write` is a tool-level MCP grant/,
+        'Remote MCP Context Gate must call out github/pull_request_review_write as tool-level',
+    );
+    assert.match(
+        gateSection,
+        /method narrowing.*instruction.*not at the MCP grant layer/,
+        'Remote MCP Context Gate must say method narrowing is at instruction layer, not MCP grant layer',
+    );
+    assert.match(
+        gateSection,
+        /accepted residual risk in v1/,
+        'Remote MCP Context Gate must mark this as an accepted v1 residual risk',
+    );
+    assert.match(
+        gateSection,
+        /Mitigations:.*GitHub Remote Mutation Allowlist.*Untrusted External Content.*Externally-Posted Content Gate/s,
+        'Remote MCP Context Gate must enumerate the mitigations parallel to the linear/* model',
+    );
+});
+
+test('pr-creation-agent forbids mutating-probe pushed-visible discovery', async () => {
+    const content = await read(prCreationAgentPath);
+    const approachSection = sliceBetween(content, '## Approach', '## Hard Gates', 'pr-creation-agent Approach section');
+    assert.match(
+        approachSection,
+        /treat the sub-action as blocked and report `commits not pushed-visible; PR creation blocked`/,
+        'pr-creation-agent step 2 must block rather than probe when pushed-visible evidence is missing',
+    );
+    assert.match(
+        approachSection,
+        /Do not call `mcp_github_create_pull_request` to discover pushed-visible status from its error response/,
+        'pr-creation-agent step 2 must explicitly forbid the mutating-probe reading',
+    );
+    assert.match(
+        approachSection,
+        /mutating-probe forbidden by the `workflow-safety-gates` Mutation Intent Gate and the Critical Tool Parameter Gate/,
+        'pr-creation-agent step 2 must cite the canonical gates that forbid the mutating-probe pattern',
+    );
+    assert.doesNotMatch(
+        approachSection,
+        /the `mcp_github_create_pull_request` tool's own error response is the fallback failure surface/,
+        'pr-creation-agent step 2 must no longer authorize the tool error as a fallback failure surface',
+    );
+});
+
+test('orchestrator Output Format reflects post-split GitHub authority ownership', async () => {
+    const content = await read(orchestratorPath);
+    const outputFormatSection = sliceFrom(content, '## Output Format', 'orchestrator Output Format section');
+    assert.match(
+        outputFormatSection,
+        /`linear\/\*` was used directly by the orchestrator/,
+        'Output Format must say linear/* is used directly by the orchestrator',
+    );
+    assert.match(
+        outputFormatSection,
+        /`github\/\*` or VS Code PR extension authority was used by a delegated specialist/,
+        'Output Format must attribute github/* to delegated specialists',
+    );
+    assert.match(
+        outputFormatSection,
+        /github-context-agent.*pr-creation-agent.*pr-review-agent/,
+        'Output Format must name the three GitHub specialists',
+    );
 });
 
 test('pr-review-comments-workflow references github-context-agent reads and pr-review-agent writes', async () => {

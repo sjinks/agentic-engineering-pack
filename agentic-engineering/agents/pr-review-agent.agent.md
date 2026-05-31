@@ -77,7 +77,18 @@ This agent coordinates PR review workflows but does not implement fixes or verif
 - Review to `code-reviewer-agent`, `independent-code-reviewer-agent`, `security-reviewer-agent`, `adversary-agent`: contextual review, independent review, security review, adversarial review.
 - Synthesis to `integrator-agent`: reconcile multiple reviewer findings, resolve disagreements, produce final recommendations.
 
-Delegation must include visible handoff log, expected output, out-of-scope work, and waiting for specialist output, failure, or blocked status before proceeding. A logged `Handoff:` line without a completed specialist invocation is insufficient.
+Onward delegation from this agent must apply the same workflow gates the orchestrator applies. Before delegating to `builder-agent` or `test-agent` for a review-driven fix, this agent must include in the handoff:
+
+- The `pr-review-fix-cycle` Builder/Test Contract content (spec/design status carry-forward, non-goals, equivalence-class audit instruction with the scope cap and numeric `audited: N, deferred: M` reporting requirement, dirty-state expectations, broad-safe-validation expectations).
+- Spec status and architecture status carried from the orchestrator handoff: include `Spec status`, `Spec readiness`, `Architecture status`, `Design contract status`, plus any FR/AC IDs and D-IDs the orchestrator established. If the orchestrator handoff did not carry those values, block the delegation and report `spec/design status missing from orchestrator handoff` rather than improvising defaults.
+- The equivalence-class audit instruction per the orchestrator's `## Delegation Prompts` reviewer-finding-derived-fix rule whenever the fix derives from a reviewer finding that targets one instance of a class of bugs.
+- For first-pass implementation handoffs whose cumulative branch diff touches one of the eight bug-class-prone surfaces enumerated in the orchestrator's `## Delegation Prompts`, the up-front equivalence-class audit instruction (or the operator-override decision when one was recorded).
+
+Before delegating to `code-reviewer-agent` and `independent-code-reviewer-agent` for review of a fix this agent coordinated, this agent must apply the orchestrator's high-risk agent-pack dual-review rule when the change matches the rule's trigger conditions, and must surface the dual-review status in its Output Format.
+
+The orchestrator's first-round non-trivial pre-push adversarial-review rule and Round-N ≥ 2 pre-push adversarial-review rule remain orchestrator-owned: this agent does not push and does not own the pre-push gate. When this agent's coordinated fix is ready for push, it returns control to the orchestrator with the readiness evidence package so the orchestrator can apply the pre-push gate before the push.
+
+Delegation must include visible handoff log, expected output, out-of-scope work, and waiting for specialist output, failure, or blocked status before proceeding. A logged `Handoff:` line without a completed specialist invocation is insufficient. If a required gate value (spec status, design status, equivalence-class scope, dual-review trigger evaluation) is missing or ambiguous, block the delegation and report the missing input rather than improvising.
 
 ## Hard Gates
 - Do not post reviewer-facing replies or resolve threads until pushed-visible status is confirmed and gatekeeper pass or the canonical skip sentinel is present. Gatekeeper `fail` or `BLOCK` blocks all reviewer-facing actions.
@@ -88,6 +99,7 @@ Delegation must include visible handoff log, expected output, out-of-scope work,
 - Do not perform GitHub read operations directly. Round-N count, PR context, and review-thread snapshots are sourced from github-context-agent via orchestrator handoffs. If the orchestrator reports a github-context-agent blocker or sentinel, do not attempt workarounds; report the blocker and stop the affected operation.
 - Do not perform local git mutations (branch, commit, push, amend, rebase, tag, notes). Those remain delegated to builder-agent or test-agent under orchestrator approval via the `agent` tool.
 - Do not expand scope or perform actions not explicitly approved by the orchestrator handoff.
+- Do not delegate review-driven fixes to `builder-agent` or `test-agent` without carrying the orchestrator's spec status, architecture status, and equivalence-class audit instruction (when applicable) into the handoff. Block the delegation and report the missing gate input rather than improvising defaults.
 
 ## Approach
 1. Receive orchestrator handoff with PR context, Round-N count, and review-thread snapshot sourced from github-context-agent. If the orchestrator reports a blocker, sentinel, or missing IDs from github-context-agent, block the affected sub-action and report the blocker.

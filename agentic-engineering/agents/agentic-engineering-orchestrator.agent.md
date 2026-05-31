@@ -382,6 +382,6 @@ Required local anchors for gate enforcement, populated from the shared Requireme
 Orchestrator-specific additions:
 
 - Name any unavailable specialist exactly as `specialist <name> unavailable; reload customizations to enable`.
-- When `github/*`, `linear/*`, or VS Code PR extension authority was used directly, summarize the gate, real critical IDs, and read/write authority path without exposing secrets or full remote payloads.
+- When `linear/*` was used directly by the orchestrator, or when `github/*` or VS Code PR extension authority was used by a delegated specialist (`github-context-agent`, `pr-creation-agent`, or `pr-review-agent`), summarize the gate, real critical IDs, and read/write authority path without exposing secrets or full remote payloads.
 - When security-tester promotion was proposed, report whether the full Authorization Contract and verbatim current-session approval were recorded; do not summarize this as a generic security review.
 - When a shared package is intentionally omitted, state `not applicable` with one phrase explaining why.
