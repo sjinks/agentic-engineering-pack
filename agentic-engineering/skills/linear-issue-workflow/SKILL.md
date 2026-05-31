@@ -46,7 +46,7 @@ Use orchestrator-owned Linear MCP read operations to fetch issue context:
 
 GitHub PR creation is delegated to `pr-creation-agent` after implementation is fully verified:
 - Call PR creation only after all implementation changes have been tested and reviewed.
-- Delegate PR creation to `pr-creation-agent` via the orchestrator with exact parameters: owner, repo, base, head, title, body, draft flag, and readiness evidence. `pr-creation-agent` owns the `mcp_github_create_pull_request` grant.
+- Delegate PR creation to `pr-creation-agent` via the orchestrator with exact parameters: owner, repo, base, head, title, body, draft flag, and readiness evidence. `pr-creation-agent` owns the `github/create_pull_request` frontmatter grant, which approves/backs the `mcp_github_create_pull_request` runtime operation.
 - Before PR creation, check the target repository for a Pull Request Template and compose the PR body explicitly from the selected template or the workflow fallback; do not assume GitHub will auto-apply templates.
 - Before PR creation or PR-ready body publication, apply the `workflow-safety-gates` PR Body Audit Gate to the complete candidate body and block on failed, blocked, or ambiguous audit status.
 - GitHub repository file mutation tools are denied pack-wide: do not use `mcp_github_create_or_update_file`, `mcp_github_push_files`, or `mcp_github_delete_file` for PR creation, implementation, branch preparation, or recovery.

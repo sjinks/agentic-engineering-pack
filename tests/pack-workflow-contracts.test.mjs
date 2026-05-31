@@ -252,12 +252,65 @@ async function workflowSafetyReferenceMarkdownPaths() {
         '.github/prompts',
     ];
     const paths = [...directPaths];
+    for (const root of roots) {
+        paths.push(...await markdownPathsUnder(root));
+    }
+
+    return [...new Set(paths)].sort();
+}
+
+async function packRuntimeGrantContractMarkdownPaths() {
+    const directPaths = await existingPaths([rootReadmePath]);
+    const roots = [
+        'agentic-engineering/docs',
+        'agentic-engineering/shared',
+        'agentic-engineering/skills',
+        'agentic-engineering/agents',
+    ];
+    const paths = [...directPaths];
 
     for (const root of roots) {
         paths.push(...await markdownPathsUnder(root));
     }
 
     return [...new Set(paths)].sort();
+}
+
+const staleGithubMcpGrantPatterns = [
+    {
+        label: 'owns mcp_github grant',
+        pattern: /\bowns?\b[^\n.]{0,80}`mcp_github_[^`\s]+`[^\n.]{0,50}\b(?:frontmatter\s+)?grants?\b/i,
+    },
+    {
+        label: 'mcp_github frontmatter grant',
+        pattern: /`mcp_github_[^`\s]+`[^\n.]{0,60}\bfrontmatter\s+grants?\b/i,
+    },
+    {
+        label: 'frontmatter grant names mcp_github',
+        pattern: /\bfrontmatter\s+grants?\b(?:\s*(?:is|are|uses?|names?|selects?|as|:)|[^\n.`]{1,60}\b(?:is|are|:))\s*`mcp_github_[^`\s]+`/i,
+    },
+    {
+        label: 'grant or permission names mcp_github',
+        pattern: /^(?![^\n.]{0,80}\bfrontmatter\s+grants?\b)\s*[^\n.]{0,80}\b(?:grants?|permissions?)\b[^\n.]{0,80}\b(?:is|are|:)\s*`mcp_github_[^`\s]+`/i,
+    },
+    {
+        label: 'mcp_github runtime method as grant',
+        pattern: /(?:\b(?:use|uses|using|selects?|names?|specif(?:y|ies)|sets?|treats?|describes?)\b[^\n.]{0,80}`mcp_github_[^`\s]+`(?![^\n.]{0,40}\bfrontmatter\s+grants?\b)[^\n.]{0,40}\b(?:grants?|permissions?)\b|`mcp_github_[^`\s]+`[^\n.]{0,20}\b(?:is|as)\s+(?:a\s+|the\s+)?(?:grants?|permissions?)\b)/i,
+    },
+    {
+        label: 'granted mcp_github runtime method',
+        pattern: /\b(?:(?:is|are|was|were|be|been|being)\s+|(?:has|have|had)\s+been\s+)granted\b[^\n.]{0,80}`mcp_github_[^`\s]+`/i,
+    },
+    {
+        label: 'mcp_github grant ownership',
+        pattern: /`mcp_github_[^`\s]+`[^\n.]{0,40}\b(?:grants?|permissions?)\b[^\n.]{0,60}\b(?:belongs?\s+to|is\s+(?:owned|assigned)\s+to|owned\s+by|assigned\s+to)\b/i,
+    },
+];
+
+function staleGithubMcpGrantPhraseViolations(path, text) {
+    return text.split(/\r?\n/).flatMap((line, index) => staleGithubMcpGrantPatterns
+        .filter(({ pattern }) => pattern.test(line))
+        .map(({ label }) => `${path}:${index + 1}: ${label}: ${line.trim()}`));
 }
 
 function markdownLinkTargets(markdown) {
@@ -765,6 +818,75 @@ test('operator guide delegates PR creation to pr-creation-agent and rejects stal
     assert.doesNotMatch(text, /orchestrator-only GitHub PR creation/i);
     assert.doesNotMatch(text, /`?github\/\*`? namespace grants stay orchestrator-only/i);
     assert.doesNotMatch(text, /orchestrator-only.*github\/\*|github\/\*.*orchestrator-only/i);
+});
+
+test('linear workflow names exact GitHub PR grant and mcp_github runtime operation distinctly', async () => {
+    const text = await read(linearSkillPath);
+
+    assert.match(text, /`pr-creation-agent` owns the `github\/create_pull_request` frontmatter grant, which approves\/backs the `mcp_github_create_pull_request` runtime operation/);
+    assert.deepEqual(staleGithubMcpGrantPhraseViolations(linearSkillPath, text), []);
+});
+
+test('GitHub MCP grant phrase matcher rejects stale runtime-method grant wording', () => {
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'PR Creation Agent owns the `mcp_github_create_pull_request` grant.'),
+        ['sample.md:1: owns mcp_github grant: PR Creation Agent owns the `mcp_github_create_pull_request` grant.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'Use the `mcp_github_create_pull_request` frontmatter grant for PR creation.'),
+        ['sample.md:1: mcp_github frontmatter grant: Use the `mcp_github_create_pull_request` frontmatter grant for PR creation.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'The frontmatter grant is `mcp_github_create_pull_request`.'),
+        ['sample.md:1: frontmatter grant names mcp_github: The frontmatter grant is `mcp_github_create_pull_request`.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'The frontmatter grant for PR creation is `mcp_github_create_pull_request`.'),
+        ['sample.md:1: frontmatter grant names mcp_github: The frontmatter grant for PR creation is `mcp_github_create_pull_request`.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'The PR creation permission is `mcp_github_create_pull_request`.'),
+        ['sample.md:1: grant or permission names mcp_github: The PR creation permission is `mcp_github_create_pull_request`.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'The approved PR creation grant is `mcp_github_create_pull_request`.'),
+        ['sample.md:1: grant or permission names mcp_github: The approved PR creation grant is `mcp_github_create_pull_request`.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'Use the `mcp_github_create_pull_request` grant for PR creation.'),
+        ['sample.md:1: mcp_github runtime method as grant: Use the `mcp_github_create_pull_request` grant for PR creation.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'Treat the `mcp_github_create_pull_request` as the PR creation permission.'),
+        ['sample.md:1: mcp_github runtime method as grant: Treat the `mcp_github_create_pull_request` as the PR creation permission.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'pr-creation-agent is granted `mcp_github_create_pull_request`.'),
+        ['sample.md:1: granted mcp_github runtime method: pr-creation-agent is granted `mcp_github_create_pull_request`.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'The `mcp_github_create_pull_request` grant belongs to pr-creation-agent.'),
+        ['sample.md:1: mcp_github grant ownership: The `mcp_github_create_pull_request` grant belongs to pr-creation-agent.'],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'Pending-review inline comments (`mcp_github_add_pull_request_review_comment_to_pending_review`) are not currently granted in this pack.'),
+        [],
+    );
+    assert.deepEqual(
+        staleGithubMcpGrantPhraseViolations('sample.md', 'Use the `github/create_pull_request` frontmatter grant approving the `mcp_github_create_pull_request` runtime operation.'),
+        [],
+    );
+});
+
+test('pack docs skills and agents describe mcp_github names as runtime operations, not frontmatter grants', async () => {
+    const paths = await packRuntimeGrantContractMarkdownPaths();
+    const violations = [];
+
+    for (const path of paths) {
+        violations.push(...staleGithubMcpGrantPhraseViolations(path, await read(path)));
+    }
+
+    assert.deepEqual(violations, []);
 });
 
 test('pr-review-thread-context documents orchestrator-sourced github-context-agent reads', async () => {
@@ -1713,7 +1835,7 @@ test('Linear Issue to PR docs summary checks template choice before PR Body Audi
 
     const templateCheck = section.indexOf('8. Checks the target repository for PR templates');
     const auditGate = section.indexOf('9. Applies the PR Body Audit Gate');
-    const prCreation = section.indexOf('10. Delegates GitHub PR creation to `pr-creation-agent` with `mcp_github_create_pull_request`');
+    const prCreation = section.indexOf('10. Delegates GitHub PR creation to `pr-creation-agent` with the `github/create_pull_request` frontmatter grant approving the `mcp_github_create_pull_request` runtime operation');
 
     assert.ok(templateCheck >= 0, 'Linear Issue to PR summary checks PR templates');
     assert.ok(auditGate > templateCheck, 'PR Body Audit Gate follows template choice in the summary');
@@ -1826,7 +1948,7 @@ test('github-context-agent has exact read-only grants and no write grants', asyn
     // Positive assertions: must have core PR read grants
     assert.match(frontmatter, /github\/pull_request_read/m, 'has github/pull_request_read');
     assert.match(frontmatter, /github\.vscode-pull-request-github\/activePullRequest/m, 'has activePullRequest');
-    // Additional read-only grants are allowed (e.g., github/get_commit, github/issue_read, github/list_*, etc.)
+    // Additional exact read-only grants are allowed (e.g., github/get_commit, github/issue_read, etc.)
     // but we don't assert specific ones to avoid brittleness
 
     // Strong negative assertions: no write grants, no wildcards, no mutation tools

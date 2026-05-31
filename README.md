@@ -84,7 +84,7 @@ The pack uses minimal permissions per role.
 | Agent | Tools |
 | --- | --- |
 | Orchestrator | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*` |
-| GitHub Context Agent | `read`, `search`, exact GitHub read-only grants: `github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`, plus repository/issue/release/tag/commit/user/status reads (`github/get_commit`, `github/get_file_contents`, `github/issue_read`, `github/list_*`, `github/get_*`, `github/search_*`) |
+| GitHub Context Agent | `read`, `search`, explicit GitHub read-only frontmatter grants: `github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`, plus enumerated repository/issue/release/tag/commit/user/status reads such as `github/list_branches`, `github/list_commits`, `github/get_commit`, `github/get_file_contents`, `github/issue_read`, `github/search_code`, `github/search_pull_requests` |
 | PR Creation Agent | `read`, exact GitHub PR creation grant: `github/create_pull_request` |
 | PR Review Agent | `read`, `search`, `agent`, `vscode/askQuestions`, exact GitHub PR review write grants: `github/pull_request_review_write`, `github/add_reply_to_pull_request_comment`, `github.vscode-pull-request-github/resolveReviewThread` |
 | Vault Context | exact `obsidian/...` read-only grants: `obsidian/search_vault`, `obsidian/search_vault_simple`, `obsidian/search_vault_smart`, `obsidian/get_vault_file`, `obsidian/get_vault_file_partial`, `obsidian/get_files_by_tag`, `obsidian/get_backlinks`, `obsidian/get_outgoing_links`, `obsidian/list_vault_files`, `obsidian/get_server_info` |
@@ -150,7 +150,7 @@ The `Run Linear Issue Workflow` prompt integrates Linear issues with GitHub pull
 7. Pushes to the branch via delegated local git mechanics after readiness evidence is present.
 8. Checks the target repository for a Pull Request Template in standard GitHub locations, uses a single readable template as the PR body structure even if other candidates are unreadable, asks with `vscode/askQuestions` when multiple readable templates require a user choice, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask-or-block when a chosen template is unreadable but readable alternatives exist, or falls back to the pack-generated PR body when no template is found or no readable candidates exist.
 9. Applies the PR Body Audit Gate to the complete selected-template/fallback candidate body and proceeds only with `pass` or `repaired` status.
-10. Delegates PR creation to `pr-creation-agent` with the audited selected-template/fallback body, issue context, validation, review notes, risks, and exact parameters: owner, repo, base, head, title, draft flag, and readiness evidence. `pr-creation-agent` owns the `mcp_github_create_pull_request` grant.
+10. Delegates PR creation to `pr-creation-agent` with the audited selected-template/fallback body, issue context, validation, review notes, risks, and exact parameters: owner, repo, base, head, title, draft flag, and readiness evidence. `pr-creation-agent` owns the `github/create_pull_request` frontmatter grant, which approves the `mcp_github_create_pull_request` runtime operation.
 11. Reports the outcome, operator-facing PR template status, manual workspace-preparation status, workspace scope cleanup status when applicable, and proposes Linear status/comment updates.
 
 It can use `pull-request-description` on request to generate a final copy/pasteable PR body after review/fix cycles are complete.
