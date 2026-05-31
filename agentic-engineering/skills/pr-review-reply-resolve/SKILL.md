@@ -41,8 +41,8 @@ Pending-review inline comments are staged draft content, not GitHub-visible post
 
 - In direct-reply mode, a successful per-thread reply creation can satisfy the posted-evidence prerequisite for that thread.
 - In pending-review mode, reply creation and pending-review submission are separate sub-actions. Do not collapse them into `reply+resolve`.
-- If pending-review submission fails, is skipped, returns an ambiguous result, or cannot be confirmed as GitHub-visible, stop before resolution and classify the affected threads as `pending-submit-failed` or `pending-submit-unconfirmed`.
-- If the Externally-Posted Content Gate rejects any pending-review inline comment or review body, do not submit the pending review. Rejected content is not submitted. If any rejected content was already staged, delete or abandon that pending review before any thread resolution. Report the operator-facing state as blocked or abandoned; do not post the rejected content and do not resolve affected threads.
+- If pending-review submission fails, is skipped, returns an ambiguous result, or cannot be confirmed as GitHub-visible, stop before resolution and report each affected thread as `blocked` with an operator-facing reason. If the failure happened before any per-thread reply or pending-review creation was attempted, report the affected thread as `untouched` with the reason instead.
+- If the Externally-Posted Content Gate rejects any pending-review inline comment or review body, do not submit the pending review. Rejected content is not submitted. If any rejected content was already staged, discard that pending review before any thread resolution when an approved future workflow provides that cleanup path. Report affected threads as `blocked` with an operator-facing reason; do not post the rejected content and do not resolve affected threads.
 - Resolution may proceed for a pending-review thread only after the corresponding pending inline comment is confirmed posted and all other resolution prerequisites still pass.
 
 ## Approved Resolution Surface
@@ -62,7 +62,7 @@ Process reply-then-resolve pairs conservatively:
 - `untouched`: reply was not attempted because a prerequisite or earlier sub-action failed.
 - `blocked`: missing real reply ID, missing direct reply `commentId`, rejected `commentId` provenance, missing real thread ID, or unavailable exact surface.
 
-(When pending-review inline support is not granted, `pending-staged`, `pending-submit-failed`, `pending-submit-unconfirmed`, and `abandoned` buckets are not applicable.)
+These four bucket names are the active bucket set and the source of truth for reporting. When pending-review inline support is not granted, do not introduce pending-review-specific bucket names; map pending-review failures to `blocked` or `untouched` with operator-facing reasons.
 
 On the first per-thread reply or resolve failure, stop the loop and report counts plus thread IDs in each bucket. Do not issue duplicate replies as automatic recovery.
 

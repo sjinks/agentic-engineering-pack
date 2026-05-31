@@ -1016,11 +1016,13 @@ test('pending-review submit and delete tools are intentionally absent from the a
     assert.match(safety, /Pending-review inline comment tool status: `mcp_github_add_pull_request_review_comment_to_pending_review` is not currently granted/);
 });
 
-test('pending-review partial failure buckets are documented but not active', async () => {
+test('pending-review failures map to active partial failure buckets', async () => {
     const replyResolve = await read(prReviewReplyResolvePath);
 
-    assert.match(replyResolve, /\(When pending-review inline support is not granted/);
-    assert.match(replyResolve, /`pending-staged`, `pending-submit-failed`, `pending-submit-unconfirmed`, and `abandoned` buckets are not applicable/);
+    assert.match(replyResolve, /These four bucket names are the active bucket set and the source of truth for reporting/);
+    assert.match(replyResolve, /When pending-review inline support is not granted, do not introduce pending-review-specific bucket names/);
+    assert.match(replyResolve, /map pending-review failures to `blocked` or `untouched` with operator-facing reasons/);
+    assert.doesNotMatch(replyResolve, /`pending-staged`|`pending-submit-failed`|`pending-submit-unconfirmed`|`abandoned`/);
     assert.match(replyResolve, /On the first per-thread reply or resolve failure, stop the loop/);
     assert.doesNotMatch(replyResolve, /On the first per-thread reply, pending-review submit, abandon\/delete, or resolve failure/);
 });
