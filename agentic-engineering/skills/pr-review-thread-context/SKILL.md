@@ -40,7 +40,7 @@ When the orchestrator is not on the call path or github-context-agent reads are 
 Return:
 
 - PR identity: owner, repo, PR number, URL if available, head branch, base branch, PR head SHA, and source path for each field.
-- Read paths used: active PR extension read, MCP `get_review_comments`, GraphQL fallback, or not used, with success/failure status.
+- Read paths used: active PR extension read, github-context-agent-owned MCP `get`, `get_review_comments`, and `get_reviews` reads, or not used, with success/failure status and read/not-read boundaries.
 - Freshness: timestamp or sequence point, whether the snapshot is pre-push or post-push, and whether it is fresh for gatekeeper/reply/resolve.
 - Thread snapshot: unresolved/reopened threads, resolved threads when relevant, outdated status when available, cited file/region, latest reviewer comment, thread node ID if available, comment database ID if available, direct existing-comment reply `commentId` if available, and whether review-thread and nested-comment pagination was exhausted or intentionally not needed.
 - Per-subaction readiness: `reply-ready`, `resolve-ready`, `gatekeeper-ready`, or `blocked` for each thread/sub-action.
@@ -51,6 +51,6 @@ Return:
 
 - If a required real critical identifier is unavailable, block only the affected reply or resolve sub-action and report the missing field.
 - If the fresh unresolved/reopened snapshot cannot be produced, gatekeeper input is unknown; pass a blocker to `pr-review-round-closure` rather than reusing stale data.
-- If GraphQL fallback pagination cannot be exhausted for the needed `reviewThreads` or nested `comments` connections, mark the snapshot incomplete/blocked and do not present it as fresh or gatekeeper-ready.
+- If github-context-agent-owned reads do not provide the needed `reviewThreads` or nested `comments` IDs, or pagination/read completeness cannot be proven, mark the affected reply/resolve sub-action or gatekeeper snapshot incomplete/blocked and do not present it as fresh or gatekeeper-ready. Do not recover missing IDs through generic GraphQL CLI/API or execute-capable paths.
 - If only an arbitrary URL, file path, line number, user-provided fragment, guessed value, placeholder, dummy ID, search snippet, stale cache, or prior partial read is available, treat the ID as missing. The only URL-derived exception is the exact fresh-read `html_url` `#discussion_r<digits>` fallback for direct existing-comment reply `commentId`, under the provenance and fail-closed rules above.
 - GitHub repository file mutation tools remain denied and are never a context fallback.

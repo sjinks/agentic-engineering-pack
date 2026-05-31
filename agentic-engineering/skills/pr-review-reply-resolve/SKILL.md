@@ -60,7 +60,7 @@ Process reply-then-resolve pairs conservatively:
 - `reply+resolve`: reply succeeded and resolution succeeded.
 - `reply-only`: reply succeeded and resolution failed; do not retry the reply without explicit operator approval.
 - `untouched`: reply was not attempted because a prerequisite or earlier sub-action failed.
-- `blocked`: missing real reply ID, missing direct reply `commentId`, rejected `commentId` provenance, missing real thread ID, unsubmitted or unconfirmed pending review, required abandon/delete not completed, or unavailable exact surface.
+- `blocked`: missing real reply ID, missing direct reply `commentId`, rejected `commentId` provenance, missing real thread ID, or unavailable exact surface.
 
 (When pending-review inline support is not granted, `pending-staged`, `pending-submit-failed`, `pending-submit-unconfirmed`, and `abandoned` buckets are not applicable.)
 

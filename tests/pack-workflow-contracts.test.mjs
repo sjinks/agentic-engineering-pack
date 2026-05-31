@@ -83,6 +83,31 @@ function frontmatterValue(text, key) {
     return frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.trim();
 }
 
+function frontmatterListValues(text, key) {
+    const frontmatter = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? '';
+    const keyPattern = new RegExp(`^${key}:\\s*$`);
+    const values = [];
+    let collecting = false;
+
+    for (const line of frontmatter.split(/\r?\n/)) {
+        if (keyPattern.test(line)) {
+            collecting = true;
+            continue;
+        }
+
+        if (collecting && /^[A-Za-z0-9_-]+:\s*/.test(line)) {
+            break;
+        }
+
+        const item = line.match(/^\s*-\s+(.+?)\s*$/)?.[1];
+        if (collecting && item) {
+            values.push(item.replace(/^['"]|['"]$/g, ''));
+        }
+    }
+
+    return values;
+}
+
 function pathWithin(root, relativePath) {
     return relativePath ? join(root, ...relativePath.split('/')) : root;
 }
@@ -451,7 +476,7 @@ test('pack guide contract uses the real source guide path and documents broad va
     assert.ok(commitHygiene > broadGate, 'commit readiness follows Broad Safe Validation Gate');
     assert.ok(replyResolve > broadGate, 'reply/resolve remains after Broad Safe Validation Gate');
     assert.match(flowchart, /fresh final-worktree evidence/);
-    assert.match(flowchart, /direct\/no-grant routes through orchestrator or blocks/);
+    assert.match(flowchart, /orchestrator-sourced github-context-agent reads<br\/>exact GitHub read grants only<br\/>missing IDs block affected sub-actions/);
     assert.doesNotMatch(flowchart, /Fetch PR & Comments<br\/>github\/\*/);
 });
 
@@ -725,6 +750,23 @@ test('README and guide permission tables list exact GitHub read grants for githu
     }
 });
 
+test('operator guide delegates PR creation to pr-creation-agent and rejects stale orchestrator-only GitHub wording', async () => {
+    const text = await read(docsPath);
+    const prCreationLine = text.split('\n').find((line) => line.includes('| [PR Creation Agent](')) ?? '';
+
+    assert.match(text, /delegates GitHub operations to a three-specialist model with explicit read-write separation/);
+    assert.match(text, /`pr-creation-agent` for PR creation only/);
+    assert.match(text, /PR creation is delegated to `pr-creation-agent` via orchestrator coordination after readiness evidence is present/);
+    assert.match(prCreationLine, /exact GitHub PR creation grant: `github\/create_pull_request`/);
+    assert.match(text, /This pack does not grant a broad GitHub namespace/);
+    assert.match(text, /GitHub access is split across exact grants owned by github-context-agent, pr-creation-agent, and pr-review-agent/);
+
+    assert.doesNotMatch(text, /PR creation as orchestrator-only/i);
+    assert.doesNotMatch(text, /orchestrator-only GitHub PR creation/i);
+    assert.doesNotMatch(text, /`?github\/\*`? namespace grants stay orchestrator-only/i);
+    assert.doesNotMatch(text, /orchestrator-only.*github\/\*|github\/\*.*orchestrator-only/i);
+});
+
 test('pr-review-thread-context documents orchestrator-sourced github-context-agent reads', async () => {
     const text = await read(prReviewThreadContextPath);
 
@@ -772,13 +814,30 @@ test('PR review thread context uses github-context-agent without direct GraphQL 
     assert.match(text, /pull_request_read/);
 });
 
-test('PR review thread context blocks incomplete GraphQL pagination snapshots', async () => {
+test('README and PR review thread context block missing IDs through github-context-agent exact reads without GraphQL fallback', async () => {
+    const guide = await read(docsPath);
+    const threadContext = await read(prReviewThreadContextPath);
+    const combined = `${guide}\n${threadContext}`;
+
+    assert.match(guide, /orchestrator-sourced github-context-agent reads<br\/>exact GitHub read grants only<br\/>missing IDs block affected sub-actions/);
+    assert.match(guide, /unavailable or unsafe IDs block only the affected sub-action/);
+    assert.match(guide, /Direct invocation without github-context-agent context[\s\S]+must block or route through the orchestrator/);
+    assert.match(threadContext, /github\.vscode-pull-request-github\/activePullRequest/);
+    assert.match(threadContext, /github\/pull_request_read/);
+    assert.match(threadContext, /If github-context-agent-owned reads do not provide the needed `reviewThreads` or nested `comments` IDs[\s\S]+mark the affected reply\/resolve sub-action or gatekeeper snapshot incomplete\/blocked/);
+    assert.match(threadContext, /Do not recover missing IDs through generic GraphQL CLI\/API or execute-capable paths/);
+    assert.doesNotMatch(combined, /GraphQL fallback/i);
+    assert.doesNotMatch(combined, /`gh api graphql` fallback/i);
+});
+
+test('PR review thread context blocks incomplete github-context-agent snapshots', async () => {
     const text = await read(prReviewThreadContextPath);
 
     assert.match(text, /Thread snapshot:[\s\S]+whether review-thread and nested-comment pagination was exhausted or intentionally not needed/);
     assert.match(text, /Per-subaction blockers:[\s\S]+incomplete pagination/);
-    assert.match(text, /If GraphQL fallback pagination cannot be exhausted for the needed `reviewThreads` or nested `comments` connections, mark the snapshot incomplete\/blocked/);
+    assert.match(text, /If github-context-agent-owned reads do not provide the needed `reviewThreads` or nested `comments` IDs, or pagination\/read completeness cannot be proven, mark the affected reply\/resolve sub-action or gatekeeper snapshot incomplete\/blocked/);
     assert.match(text, /do not present it as fresh or gatekeeper-ready/);
+    assert.doesNotMatch(text, /GraphQL fallback/i);
 });
 
 test('PR review validation focused skill preserves six evidence-based classifications', async () => {
@@ -1641,7 +1700,7 @@ test('operator-facing docs require PR Body Audit Gate before PR creation', async
         assert.ok(prCreation > auditGate, `${path} creates PR only after PR Body Audit Gate`);
         assert.match(text, /complete selected-template\/fallback candidate body|pass\/repaired complete body/, `${path} audits the complete candidate body`);
         assert.match(text, /`pass` or `repaired` status|pass\/repaired complete body/, `${path} requires pass or repaired audit status`);
-        assert.match(text, /audited selected-template\/fallback body/, `${path} creates the PR with the audited body`);
+        assert.match(text, /audited selected-template\/fallback body|Delegate GitHub PR creation<br\/>to pr-creation-agent<br\/>mcp_github_create_pull_request/, `${path} creates the PR with the audited body or delegates creation after audit`);
         assert.doesNotMatch(text, /mcp_github_create_pull_request[^\n]+template status/i, `${path} keeps template status out of PR creation`);
     }
 
@@ -1654,7 +1713,7 @@ test('Linear Issue to PR docs summary checks template choice before PR Body Audi
 
     const templateCheck = section.indexOf('8. Checks the target repository for PR templates');
     const auditGate = section.indexOf('9. Applies the PR Body Audit Gate');
-    const prCreation = section.indexOf('10. Creates GitHub PR with `mcp_github_create_pull_request`');
+    const prCreation = section.indexOf('10. Delegates GitHub PR creation to `pr-creation-agent` with `mcp_github_create_pull_request`');
 
     assert.ok(templateCheck >= 0, 'Linear Issue to PR summary checks PR templates');
     assert.ok(auditGate > templateCheck, 'PR Body Audit Gate follows template choice in the summary');
@@ -1863,6 +1922,17 @@ test('pr-review-agent has exact write grants and no read grants', async () => {
 
 test('workflow-safety-gates describes three-specialist GitHub split', async () => {
     const workflowSafety = await read(workflowSafetyGatesPath);
+    const prReviewAgent = await read(prReviewAgentPath);
+    const expectedPrReviewAgentWriteGrants = [
+        'github/pull_request_review_write',
+        'github/add_reply_to_pull_request_comment',
+        'github.vscode-pull-request-github/resolveReviewThread',
+    ].sort();
+    const prReviewAgentWriteGrants = frontmatterListValues(prReviewAgent, 'tools')
+        .filter((tool) => tool.startsWith('github/') || tool.startsWith('github.vscode-pull-request-github/'))
+        .sort();
+
+    assert.deepEqual(prReviewAgentWriteGrants, expectedPrReviewAgentWriteGrants, 'pr-review-agent frontmatter grants the current exact PR review write set');
     
     assert.doesNotMatch(workflowSafety, /orchestrator-only.*github\/\*|github\/\*.*orchestrator-only/i, 'does not claim orchestrator-only github/* wildcard');
     assert.doesNotMatch(workflowSafety, /orchestrator holds.*github\/\*|github\/\*.*orchestrator holds/i, 'does not claim orchestrator-held github/* wildcard');
@@ -1874,7 +1944,10 @@ test('workflow-safety-gates describes three-specialist GitHub split', async () =
     assert.match(remoteMcpSection, /read-write/i, 'mentions read-write split');
     assert.match(remoteMcpSection, /github\/pull_request_read/i, 'mentions github/pull_request_read');
     assert.match(remoteMcpSection, /github\/create_pull_request/i, 'mentions github/create_pull_request');
-    assert.match(remoteMcpSection, /github\/pull_request_review_write/i, 'mentions github/pull_request_review_write');
+    for (const grant of prReviewAgentWriteGrants) {
+        const escapedGrant = grant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        assert.match(remoteMcpSection, new RegExp(escapedGrant, 'i'), `Remote MCP Context Gate mentions ${grant}`);
+    }
 });
 
 test('pr-review-comments-workflow references github-context-agent reads and pr-review-agent writes', async () => {
