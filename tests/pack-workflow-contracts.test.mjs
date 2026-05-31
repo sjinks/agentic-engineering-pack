@@ -1800,7 +1800,7 @@ test('PR description body audit guards against hard-wrapped PR bodies and leakag
 test('orchestrator has no GitHub tools and includes github-context-agent, pr-creation-agent, and pr-review-agent', async () => {
     const orchestrator = await read(orchestratorPath);
     const frontmatter = orchestrator.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? '';
-    
+
     assert.doesNotMatch(frontmatter, /github\/\*/i, 'orchestrator has no github/* wildcard');
     assert.doesNotMatch(frontmatter, /github\/create_pull_request/i, 'orchestrator has no github/create_pull_request');
     assert.doesNotMatch(frontmatter, /github\/pull_request_read/i, 'orchestrator has no github/pull_request_read');
@@ -1808,7 +1808,7 @@ test('orchestrator has no GitHub tools and includes github-context-agent, pr-cre
     assert.doesNotMatch(frontmatter, /mcp_github_pull_request_read/i, 'orchestrator has no mcp_github_pull_request_read');
     assert.doesNotMatch(frontmatter, /github\.vscode-pull-request-github\/activePullRequest/i, 'orchestrator has no activePullRequest');
     assert.doesNotMatch(frontmatter, /github\.vscode-pull-request-github\/resolveReviewThread/i, 'orchestrator has no resolveReviewThread');
-    
+
     assert.match(orchestrator, /agents:/m, 'orchestrator has agents list');
     assert.match(orchestrator, /- github-context-agent/m, 'orchestrator includes github-context-agent');
     assert.match(orchestrator, /- pr-creation-agent/m, 'orchestrator includes pr-creation-agent');
@@ -1817,18 +1817,18 @@ test('orchestrator has no GitHub tools and includes github-context-agent, pr-cre
 
 test('github-context-agent has exact read-only grants and no write grants', async () => {
     const agent = await read(githubContextAgentPath);
-    
+
     assert.equal(await exists(githubContextAgentPath), true, 'github-context-agent exists');
     assert.equal(frontmatterValue(agent, 'user-invocable'), 'false', 'github-context-agent is not user-invocable');
     assert.equal(frontmatterValue(agent, 'name'), '"github-context-agent"');
-    
+
     const frontmatter = agent.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? '';
     // Positive assertions: must have core PR read grants
     assert.match(frontmatter, /github\/pull_request_read/m, 'has github/pull_request_read');
     assert.match(frontmatter, /github\.vscode-pull-request-github\/activePullRequest/m, 'has activePullRequest');
     // Additional read-only grants are allowed (e.g., github/get_commit, github/issue_read, github/list_*, etc.)
     // but we don't assert specific ones to avoid brittleness
-    
+
     // Strong negative assertions: no write grants, no wildcards, no mutation tools
     assert.doesNotMatch(frontmatter, /mcp_github_pull_request_read\b/m, 'does not have mcp_github_pull_request_read in frontmatter');
     assert.doesNotMatch(frontmatter, /github\/\*/i, 'has no github/* wildcard');
@@ -1846,7 +1846,7 @@ test('github-context-agent has exact read-only grants and no write grants', asyn
     assert.doesNotMatch(frontmatter, /mcp_github_delete_file/i, 'has no mcp_github_delete_file');
     assert.doesNotMatch(frontmatter, /github\/update_file/i, 'has no github/update_file');
     assert.doesNotMatch(frontmatter, /github\/delete_file/i, 'has no github/delete_file');
-    
+
     // Content checks for read-only ownership
     const description = agent.match(/description: ["'](.+?)["']/)?.[1] ?? '';
     assert.match(description, /read-only/i, 'description mentions read-only');
@@ -1857,11 +1857,11 @@ test('github-context-agent has exact read-only grants and no write grants', asyn
 
 test('pr-creation-agent has exact PR creation grant and delegates reads', async () => {
     const agent = await read(prCreationAgentPath);
-    
+
     assert.equal(await exists(prCreationAgentPath), true, 'pr-creation-agent exists');
     assert.equal(frontmatterValue(agent, 'user-invocable'), 'false', 'pr-creation-agent is not user-invocable');
     assert.equal(frontmatterValue(agent, 'name'), '"pr-creation-agent"');
-    
+
     const frontmatter = agent.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? '';
     assert.match(frontmatter, /github\/create_pull_request/m, 'has github/create_pull_request');
     assert.doesNotMatch(frontmatter, /github\/pull_request_read/m, 'does not have github/pull_request_read (belongs to github-context-agent)');
@@ -1880,7 +1880,7 @@ test('pr-creation-agent has exact PR creation grant and delegates reads', async 
     assert.doesNotMatch(frontmatter, /mcp_github_create_or_update_file/i, 'has no repository file mutation tools');
     assert.doesNotMatch(frontmatter, /mcp_github_push_files/i, 'has no mcp_github_push_files');
     assert.doesNotMatch(frontmatter, /mcp_github_delete_file/i, 'has no mcp_github_delete_file');
-    
+
     // Content checks for github-context-agent delegation and post-create verification
     assert.match(agent, /github-context-agent/i, 'mentions github-context-agent for read delegation');
     assert.match(agent, /post-create verification|verification after creation/i, 'mentions post-create verification');
@@ -1888,11 +1888,11 @@ test('pr-creation-agent has exact PR creation grant and delegates reads', async 
 
 test('pr-review-agent has exact write grants and no read grants', async () => {
     const agent = await read(prReviewAgentPath);
-    
+
     assert.equal(await exists(prReviewAgentPath), true, 'pr-review-agent exists');
     assert.equal(frontmatterValue(agent, 'user-invocable'), 'false', 'pr-review-agent is not user-invocable');
     assert.equal(frontmatterValue(agent, 'name'), '"pr-review-agent"');
-    
+
     const frontmatter = agent.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? '';
     assert.match(frontmatter, /github\/pull_request_review_write/m, 'has github/pull_request_review_write');
     assert.match(frontmatter, /github\/add_reply_to_pull_request_comment/m, 'has github/add_reply_to_pull_request_comment');
@@ -1914,7 +1914,7 @@ test('pr-review-agent has exact write grants and no read grants', async () => {
     assert.doesNotMatch(frontmatter, /mcp_github_create_or_update_file/i, 'has no repository file mutation tools');
     assert.doesNotMatch(frontmatter, /mcp_github_push_files/i, 'has no mcp_github_push_files');
     assert.doesNotMatch(frontmatter, /mcp_github_delete_file/i, 'has no mcp_github_delete_file');
-    
+
     // Content checks for github-context-agent delegation and orchestrator-sourced context
     assert.match(agent, /github-context-agent/i, 'mentions github-context-agent for read delegation');
     assert.match(agent, /orchestrator-sourced|orchestrator coordination/i, 'mentions orchestrator-sourced context');
@@ -1933,10 +1933,10 @@ test('workflow-safety-gates describes three-specialist GitHub split', async () =
         .sort();
 
     assert.deepEqual(prReviewAgentWriteGrants, expectedPrReviewAgentWriteGrants, 'pr-review-agent frontmatter grants the current exact PR review write set');
-    
+
     assert.doesNotMatch(workflowSafety, /orchestrator-only.*github\/\*|github\/\*.*orchestrator-only/i, 'does not claim orchestrator-only github/* wildcard');
     assert.doesNotMatch(workflowSafety, /orchestrator holds.*github\/\*|github\/\*.*orchestrator holds/i, 'does not claim orchestrator-held github/* wildcard');
-    
+
     const remoteMcpSection = sliceBetween(workflowSafety, '## Remote MCP Context Gate', '## Obsidian Vault Context Gate', 'Remote MCP Context Gate section');
     assert.match(remoteMcpSection, /github-context-agent/i, 'mentions github-context-agent');
     assert.match(remoteMcpSection, /pr-creation-agent/i, 'mentions pr-creation-agent');
@@ -1952,7 +1952,7 @@ test('workflow-safety-gates describes three-specialist GitHub split', async () =
 
 test('pr-review-comments-workflow references github-context-agent reads and pr-review-agent writes', async () => {
     const prReviewWorkflow = await read(prReviewSkillPath);
-    
+
     assert.match(prReviewWorkflow, /github-context-agent/i, 'references github-context-agent');
     assert.match(prReviewWorkflow, /pr-review-agent/i, 'references pr-review-agent');
     assert.match(prReviewWorkflow, /orchestrator.*coordination|orchestrator.*handoff|coordination.*orchestrator|handoff.*orchestrator/i, 'mentions orchestrator coordination or handoff');
