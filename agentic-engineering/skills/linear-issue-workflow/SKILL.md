@@ -20,7 +20,7 @@ Use this skill to fetch a Linear issue through the Linear MCP server, triage it 
 
 ## MCP Access
 
-Linear and GitHub MCP access is orchestrator-owned in this pack. The orchestrator performs required remote reads and gated remote mutations, then passes distilled context to specialists. Specialists must not be granted `linear/*` or `github/*`.
+Linear MCP access is orchestrator-owned in this pack. GitHub operations use a three-specialist model: `github-context-agent` for all read-only operations, `pr-creation-agent` for PR creation only, and `pr-review-agent` for review write operations only. The orchestrator performs required Linear remote reads and gated remote mutations, then passes distilled context to specialists. The orchestrator calls github-context-agent for GitHub reads (PR metadata, review state) and passes that context to pr-creation-agent and pr-review-agent. Specialists must not be granted `linear/*` or direct GitHub access; GitHub operations flow through the delegated GitHub agents.
 
 Obsidian vault context, when useful, is delegated only to `vault-context-agent` under the `workflow-safety-gates` Obsidian Vault Context Gate. Use it for narrow private project-note context such as prior decisions, Acceptance criteria, ADRs, threat models, and edge cases. Do not grant broad vault wildcards such as `obsidian/*`, and do not grant vault mutation, active-file, command, template, attachment, create, update, patch, delete, or rename tools.
 
@@ -42,18 +42,18 @@ Use orchestrator-owned Linear MCP read operations to fetch issue context:
 - Do not update Linear (status, comments, assignee, labels, or metadata) unless the Linear Remote Mutation Allowlist passes with explicit user approval and exact tool/ID availability.
 - Do not use substitute or adjacent Linear mutation tools when the exact approved Linear tool or ID is missing. If the exact tool/ID is unavailable, stop with guidance instead of falling back to a different mutation tool. This mirrors the no-substitute rule already enforced for `mcp_linear_get_issue` reads.
 
-### GitHub MCP
+### GitHub PR Creation
 
-Use orchestrator-owned GitHub MCP only for pull request creation and repository metadata after implementation is fully verified:
-- Call PR creation tools only after all implementation changes have been tested and reviewed.
-- Before PR creation, explicitly select and name `mcp_github_create_pull_request` as the intended and only approved PR creation tool.
-- Before PR creation, check the target repository for a Pull Request Template and compose the PR body explicitly from the selected template or the workflow fallback; do not assume GitHub MCP/API will auto-apply templates.
+GitHub PR creation is delegated to `pr-creation-agent` after implementation is fully verified:
+- Call PR creation only after all implementation changes have been tested and reviewed.
+- Delegate PR creation to `pr-creation-agent` via the orchestrator with exact parameters: owner, repo, base, head, title, body, draft flag, and readiness evidence. `pr-creation-agent` owns the `mcp_github_create_pull_request` grant.
+- Before PR creation, check the target repository for a Pull Request Template and compose the PR body explicitly from the selected template or the workflow fallback; do not assume GitHub will auto-apply templates.
 - Before PR creation or PR-ready body publication, apply the `workflow-safety-gates` PR Body Audit Gate to the complete candidate body and block on failed, blocked, or ambiguous audit status.
 - GitHub repository file mutation tools are denied pack-wide: do not use `mcp_github_create_or_update_file`, `mcp_github_push_files`, or `mcp_github_delete_file` for PR creation, implementation, branch preparation, or recovery.
 - During PR creation, do not use substitute mutating tools, adjacent tools, delegation commands, or `mcp_github_create_pull_request_with_copilot`.
-- If `mcp_github_create_pull_request` is unavailable, ambiguous, or fails before creating the PR, stop and provide a PR-ready summary instead of trying any substitute.
+- If `pr-creation-agent` or `mcp_github_create_pull_request` is unavailable, ambiguous, or fails before creating the PR, stop and provide a PR-ready summary instead of trying any substitute.
 - Include the Linear issue link in the PR body.
-- Do not use GitHub MCP for issue updates or branching.
+- Do not use GitHub for issue updates or branching.
 - Do not create remote GitHub branches or mutate files through GitHub as a fallback for local source edits, local git workflow, builder/test delegation, commit hygiene, push mechanics, or failed/unavailable tooling.
 
 ## Workflow

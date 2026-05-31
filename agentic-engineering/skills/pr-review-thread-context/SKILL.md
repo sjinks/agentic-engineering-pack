@@ -1,30 +1,32 @@
 ---
 name: pr-review-thread-context
-description: "Internal use when: acquiring GitHub PR review-thread context, real thread IDs, comment reply IDs, fresh unresolved/reopened snapshots, and per-subaction blockers."
-argument-hint: "PR context, repository, branch, and the specific reply/resolve/read sub-actions that need IDs."
+description: "Internal use when: acquiring GitHub PR review-thread context, real thread IDs, comment reply IDs, fresh unresolved/reopened snapshots, and per-subaction blockers from orchestrator-sourced github-context-agent reads."
+argument-hint: "PR context from orchestrator handoff, repository, branch, and the specific reply/resolve/read sub-actions that need IDs."
 user-invocable: false
 ---
 
 # PR Review Thread Context
 
-Acquire PR review context and real identifiers for `pr-review-comments-workflow`. This skill is internal: the user-facing entry point remains `pr-review-comments-workflow`.
+Acquire PR review context and real identifiers for `pr-review-comments-workflow` from orchestrator-sourced github-context-agent reads. This skill is internal: the user-facing entry point remains `pr-review-comments-workflow`.
 
 ## Scope
 
-- Identify the active PR, repository, head/base branch, PR head SHA, review comments, thread state, and real IDs required for reply or resolution sub-actions.
-- Produce a fresh unresolved/reopened snapshot before `review-cycle-gatekeeper` and before reply/resolve actions.
-- Block only the affected sub-action when an ID needed for that sub-action is missing.
+- Receive orchestrator-sourced GitHub context from github-context-agent: active PR identity, repository, head/base branch, PR head SHA, review comments, thread state, and real IDs required for reply or resolution sub-actions.
+- Produce a fresh unresolved/reopened snapshot before `review-cycle-gatekeeper` and before reply/resolve actions by requesting fresh github-context-agent reads via the orchestrator.
+- Block only the affected sub-action when an ID needed for that sub-action is missing from the orchestrator-sourced context.
 - Do not infer IDs from paths, line numbers, arbitrary URLs, user-provided fragments, stale cache, search snippets, placeholders, guesses, or prior partial reads. The only URL-derived exception is the narrow `html_url` `#discussion_r<digits>` fallback described under ID Mapping, and only for direct existing-comment replies.
 
 ## Approved Read Paths
 
-Use the first available read-only source that satisfies the needed fields:
+GitHub PR review-thread context is owned by `github-context-agent` and accessed via orchestrator handoffs. pr-review-agent does not hold `github/pull_request_read` or `github.vscode-pull-request-github/activePullRequest` grants.
 
-1. `github.vscode-pull-request-github/activePullRequest` for active PR context in VS Code. This is approved read-only PR context acquisition; it does not authorize reply or resolution.
-2. MCP `get_review_comments` (`mcp_github_pull_request_read` with method `get_review_comments`) for review comments and thread metadata when available.
-3. Orchestrator-mediated `gh api graphql` fallback when extension or MCP reads are unavailable or omit actual thread node IDs or comment database IDs. This fallback is approval-bound and may run only through an environment-inspector or equivalent local read-only handoff with exact repository, PR number, command scope, and output-minimization instructions from the orchestrator. Specialists must not run `gh api graphql`, request broad GitHub access, or acquire GitHub context directly. Query only the minimum shape needed for owner/repo/PR identity, review thread node IDs, and review comment database IDs. The query shape must include review-thread pagination and nested-comment pagination metadata: `repository.pullRequest.reviewThreads(first: 100, after: $reviewThreadsCursor) { pageInfo { hasNextPage endCursor } nodes { id isResolved comments(first: 50, after: $commentsCursor) { pageInfo { hasNextPage endCursor } nodes { databaseId } } } }`. Exhaust `reviewThreads.pageInfo` and each `comments.pageInfo` cursor needed for the selected threads; if any required cursor cannot be exhausted or proven unnecessary, return an incomplete/blocked snapshot rather than a fresh complete snapshot. Do not expose full payloads, review bodies, secrets, credentials, or unrelated repository data; pass only distilled IDs/context, pagination provenance, and read/not-read boundaries onward.
+1. **Orchestrator-sourced PR metadata from github-context-agent**: The orchestrator calls `github-context-agent`, which uses `github.vscode-pull-request-github/activePullRequest` and `github/pull_request_read` (with `method=get`, `method=get_review_comments`, `method=get_reviews`) to read PR identity (owner, repo, PR number, URL, head/base branches, PR head SHA), review comments, review history, and thread state. The orchestrator distills this data and passes it in the pr-review-agent handoff.
 
-Do not use any mutating GitHub, VS Code, or shell command as a probe to discover whether an ID is valid.
+2. **Orchestrator-provided thread node IDs and comment reply IDs**: The orchestrator's github-context-agent read includes review-thread node IDs (for `resolveReviewThread` operations) and review-comment reply IDs (for `github/add_reply_to_pull_request_comment` operations). These IDs are distilled and passed to pr-review-agent in the handoff.
+
+3. **Orchestrator-sourced fresh unresolved/reopened snapshots from github-context-agent**: When the `pr-review-comments-workflow` coordinator workflow requires a fresh thread state after push visibility (see that workflow's step "Refresh unresolved/reopened review-thread state after push visibility"), the orchestrator invokes github-context-agent again to re-read the thread state, then passes the fresh snapshot to pr-review-agent. This read path applies the `workflow-safety-gates` Remote Read-Only Tool Intent Gate.
+
+When the orchestrator is not on the call path or github-context-agent reads are unavailable, pr-review-agent cannot self-service this context. In that case, report that GitHub context is unavailable and route the operator to the orchestrator-mediated entry path.
 
 ## ID Mapping
 
