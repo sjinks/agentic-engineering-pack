@@ -28,6 +28,12 @@ Template:
 - Behavior details:
 - Backward compatibility:
 
+- Date: 2026-05-31
+- Scope: Expert panel output schema normalization
+- Added contract: `expert-panel` references `agentic-engineering/shared/output-format-contract.md` for shared Handoff log/status, Verification, Pre-push adversarial review status, Residual risks, and Follow-up fields.
+- Behavior details: Panel-specific fields remain local: panel roles, key findings by role, decisions made, and required actions.
+- Backward compatibility: Additive documentation and contract-test normalization only; existing panel semantics are preserved.
+
 - Date: 2026-05-29
 - Scope: Phase 2 pilot output contracts
 - Added contract: `agentic-engineering/shared/output-format-contract.md` owns reusable evidence packages for Broad Safe Validation Gate, pre-push adversarial review status, gate decisions, PR template status, and PR Body Audit Gate status.
@@ -51,6 +57,12 @@ Template:
 - Who is affected:
 - Action required:
 - Verification steps:
+
+- Date: 2026-05-31
+- Version or commit reference: Phase 2 expert-panel output contract update
+- Who is affected: Workflow authors maintaining expert-panel output expectations.
+- Action required: Reference `agentic-engineering/shared/output-format-contract.md` for shared output fields while keeping panel-specific output fields local.
+- Verification steps: Run `node scripts/lint-pack.mjs` and `node --test tests/lint-pack.test.mjs tests/pack-workflow-contracts.test.mjs`.
 
 - Date: 2026-05-29
 - Version or commit reference: Phase 2 pilot contract documentation update

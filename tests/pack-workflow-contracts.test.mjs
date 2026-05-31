@@ -341,6 +341,10 @@ function sliceFrom(text, startBoundary, label = startBoundary) {
     return text.slice(start);
 }
 
+function markdownTableRowContaining(text, phrase) {
+    return text.split('\n').find((line) => line.startsWith('|') && line.includes(phrase)) ?? '';
+}
+
 test('sliceBetween ignores an end boundary inside the start boundary', () => {
     assert.equal(sliceBetween('abc-body-c', 'abc', 'c'), 'abc-body-');
 });
@@ -561,6 +565,12 @@ test('shared output format contract owns reusable validation and PR status packa
         '### PR Template and Body Status',
         'shared pre-push adversarial review status package',
     );
+    const prTemplateSection = sliceBetween(
+        text,
+        '### PR Template and Body Status',
+        '### Test-Gap Plan Status',
+        'shared PR template and body status package',
+    );
 
     assert.match(text, /### Broad Safe Validation Gate Evidence/);
     for (const label of [
@@ -620,9 +630,130 @@ test('shared output format contract owns reusable validation and PR status packa
 
     assert.match(text, /Gate decision/);
     assert.match(text, /`pass`, `fail`, or `BLOCK`/);
-    assertPrTemplateStatuses(text, 'shared PR template status package');
-    assert.match(text, /PR Body Audit Gate status/);
-    assert.match(text, /`pass`, `repaired`, `blocked`, or `not applicable`/);
+    assertPrTemplateStatuses(prTemplateSection, 'shared PR template status package');
+    for (const label of [
+        'PR template status',
+        'Selected template path',
+        'Fallback reason',
+        'Unreadable path/error summary',
+        'Readable alternatives',
+        'User-choice blocker',
+        'PR Body Audit Gate status',
+    ]) {
+        assert.match(prTemplateSection, new RegExp('^- ' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'm'), `${label} is an exact PR Template and Body Status field label`);
+    }
+    assert.match(prTemplateSection, /selected readable template path/);
+    assert.match(prTemplateSection, /selected unreadable template with confirmed fallback/);
+    assert.match(prTemplateSection, /sanitized read-error summaries/);
+    assert.match(prTemplateSection, /readable candidate template paths/);
+    assert.match(prTemplateSection, /choosing among readable templates/);
+    assert.match(prTemplateSection, /`pass`, `repaired`, `blocked`, or `not applicable`/);
+});
+
+test('shared output format contract covers orchestrator mandatory output packages', async () => {
+    const text = await read(outputFormatContractPath);
+
+    for (const heading of [
+        '### Readiness Decision',
+        '### Requirements and Design Status',
+        '### Context and Handoff Status',
+        '### Test-Gap Plan Status',
+        '### Review Closure and Thread-State Evidence',
+        '### Equivalence-Class Follow-ups',
+        '### Verified Internals and Non-Changes',
+        '### BLOCK Sentinels and Advisory Artifacts',
+    ]) {
+        assert.match(text, new RegExp('^' + heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'm'), `${heading} package exists`);
+    }
+
+    for (const label of [
+        'Spec status',
+        'Spec readiness',
+        'Architecture status',
+        'Design contract status',
+        'Test-gap plan status',
+        'Gatekeeper thread-state evidence',
+        'Equivalence-class follow-ups',
+        'Verified-internals notes captured this session',
+        'Verified non-changes section status',
+        'BLOCK sentinels fired this session',
+        'Operator advisory artifacts',
+        'Manual workspace-preparation status',
+    ]) {
+        assert.match(text, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} is covered by the shared contract`);
+    }
+});
+
+test('orchestrator uses canonical references, routing matrix, and gate stubs', async () => {
+    const text = await read(orchestratorPath);
+    const references = sliceBetween(text, '## Canonical References', '## Mandatory Routing Matrix', 'orchestrator canonical references section');
+    const matrix = sliceBetween(text, '## Mandatory Routing Matrix', '## Workflow', 'orchestrator mandatory routing matrix section');
+    const safety = sliceBetween(text, '## Workflow Safety Gates', '## Remote MCP Context Boundaries', 'orchestrator workflow safety stubs section');
+    const output = sliceFrom(text, '## Output Format', 'orchestrator output format section');
+
+    for (const reference of [
+        '`expert-panel`',
+        '`workflow-safety-gates`',
+        '`agentic-engineering/shared/output-format-contract.md`',
+        '`review-cycle-gatekeeper`',
+        '`test-gap-to-test-plan`',
+        '`pull-request-description`',
+        '`pr-description-template-policy`',
+        '`pr-description-body-audit`',
+    ]) {
+        assert.match(references, new RegExp(reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${reference} is a canonical reference`);
+    }
+
+    assert.match(matrix, /\| Condition \| Specialist\/skill \| Required output \| Block behavior \|/);
+    for (const route of [
+        '`spec-agent`',
+        '`architect-agent`',
+        '`builder-agent`',
+        '`test-agent`',
+        '`code-reviewer-agent`',
+        '`independent-code-reviewer-agent`',
+        '`adversarial-review`',
+        '`adversary-agent`',
+        '`security-tester-agent`',
+        '`pr-review-comments-workflow`',
+        '`review-cycle-gatekeeper`',
+        '`test-gap-to-test-plan`',
+    ]) {
+        assert.match(matrix, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${route} is routed in mandatory matrix`);
+    }
+
+    assert.match(safety, /\| Condensed gate \| Trigger \| Owner\/delegate \| Required evidence package \| Stop condition \| Canonical reference \|/);
+    for (const stubField of ['trigger =', 'owner/delegate =', 'required evidence package =', 'stop condition =', 'canonical reference =']) {
+        assert.match(text, new RegExp(stubField.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${stubField} appears in local stubs`);
+    }
+
+    assert.match(output, /use `agentic-engineering\/shared\/output-format-contract\.md`/);
+    assert.doesNotMatch(output, /Broad Safe Validation Gate status when PR-review fixes are in scope: targeted verification status;/);
+});
+
+test('orchestrator mandatory routing matrix includes conditional non-discretionary review routes', async () => {
+    const text = await read(orchestratorPath);
+    const matrix = sliceBetween(text, '## Mandatory Routing Matrix', '## Workflow', 'orchestrator mandatory routing matrix section');
+
+    const highRiskAgentPack = markdownTableRowContaining(matrix, 'High-risk agent-pack change rule 12e applies');
+    assert.match(highRiskAgentPack, /`code-reviewer-agent`/);
+    assert.match(highRiskAgentPack, /`independent-code-reviewer-agent`/);
+    assert.match(highRiskAgentPack, /explicit skip rationale/);
+    assert.match(highRiskAgentPack, /skipped without the required rationale/);
+
+    const firstRoundAdversarial = markdownTableRowContaining(matrix, 'First-round or Round-N non-trivial pre-push adversarial review under Workflow 12f applies');
+    assert.match(firstRoundAdversarial, /`adversarial-review` for synthesis diffs/);
+    assert.match(firstRoundAdversarial, /`adversary-agent` for non-synthesis code diffs/);
+    assert.match(firstRoundAdversarial, /Pre-push Adversarial Review Status/);
+    assert.match(firstRoundAdversarial, /cumulative branch diff vs integration branch/);
+    assert.match(firstRoundAdversarial, /non-trivial wins over skip/);
+
+    const newSharedModuleInvoke = markdownTableRowContaining(matrix, 'New Shared Module Prompt operator chooses `invoke` under Workflow 12c');
+    assert.match(newSharedModuleInvoke, /`adversary-agent`/);
+    assert.match(newSharedModuleInvoke, /`test-gap-to-test-plan`/);
+    assert.match(newSharedModuleInvoke, /Advisory decision artifact/);
+    assert.match(newSharedModuleInvoke, /planner verdict/);
+    assert.match(newSharedModuleInvoke, /must-have cases/);
 });
 
 test('PR review workflow output format references shared output format contract', async () => {
@@ -640,6 +771,32 @@ test('PR review workflow output format references shared output format contract'
     assert.match(outputFormatSection, /Skip accepted evidence/);
     assert.doesNotMatch(outputFormatSection, /`Skip rejected`, and `Skip accepted` evidence locally/);
     assert.doesNotMatch(outputFormatSection, /Broad Safe Validation Gate: targeted verification status; broad safe validation status/);
+});
+
+test('expert panel output format references shared output contract while preserving panel fields', async () => {
+    const text = await read(expertPanelPath);
+    const outputFormatSection = sliceFrom(text, '## Output Format', 'expert panel output format section');
+
+    assert.match(outputFormatSection, /agentic-engineering\/shared\/output-format-contract\.md/);
+    assert.match(outputFormatSection, /shared core fields and reusable evidence packages/);
+    for (const label of [
+        'Panel roles used',
+        'Key findings by role',
+        'Decisions made',
+        'Required actions',
+    ]) {
+        assert.match(outputFormatSection, new RegExp('- ' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.'), `${label} remains local to expert-panel output`);
+    }
+    for (const sharedField of [
+        'Handoff log/status',
+        'Verification',
+        'Pre-push adversarial review status',
+        'Residual risks',
+        'Follow-up',
+    ]) {
+        assert.match(outputFormatSection, new RegExp(sharedField.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${sharedField} is referenced from the expert-panel output format`);
+    }
+    assert.match(outputFormatSection, /use the shared Pre-push Adversarial Review Status package/);
 });
 
 test('linear workflow output format references shared output format contract', async () => {
@@ -1281,10 +1438,11 @@ test('orchestrator PR creation guidance preserves workflow safety broad-validati
     const text = await read(orchestratorPath);
     const section = sliceFrom(text, '## PR Creation Guidance', 'orchestrator PR creation guidance section');
 
-    assert.match(section, /Apply the `workflow-safety-gates` PR Readiness Evidence Gate status semantics/);
-    assert.match(section, /`skipped` and `not applicable` satisfy readiness only with the full inspected evidence package and policy\/risk basis/);
-    assert.match(section, /repository-local discovery evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree\/fix batch, proceed\/block effect, residual risk, and next operator action/);
-    assert.match(section, /`mutating-only` is not a pass; it satisfies readiness only with that full package plus either separately reported authorized mutating\/output-writing command results with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covering not running it/);
+    assert.match(section, /Local enforcement stub: trigger = PR creation or PR-ready body preparation/);
+    assert.match(section, /Broad Safe Validation Gate Evidence when PR-review fixes are present/);
+    assert.match(section, /failed\/blocked\/stale broad validation/);
+    assert.match(section, /`workflow-safety-gates` PR Template Gate, PR Body Audit Gate, PR Readiness Evidence Gate/);
+    assert.match(section, /apply the shared Broad Safe Validation Gate Evidence package and `workflow-safety-gates` PR Readiness Evidence Gate status semantics/);
 });
 
 test('test agent reports targeted versus broad safe validation with behavior-based command classification', async () => {
@@ -1377,6 +1535,8 @@ test('gatekeeper Broad Safe Validation Gate sample template names candidate sele
 
 test('orchestrator carries Broad Safe Validation Gate evidence through PR-review handoffs and readiness', async () => {
     const text = await read(orchestratorPath);
+    const outputFormat = sliceFrom(text, '## Output Format', 'orchestrator output format section');
+    const prCreation = sliceBetween(text, '\n## PR Creation Guidance\n', '\n## Output Format\n', 'orchestrator PR creation guidance section');
 
     assert.match(text, /require the Broad Safe Validation Gate after targeted fix verification succeeds and before push readiness, reviewer-facing replies, or review-thread resolution/);
     assert.match(text, /Targeted checks alone do not satisfy broad validation when a broad safe candidate is available/);
@@ -1392,10 +1552,10 @@ test('orchestrator carries Broad Safe Validation Gate evidence through PR-review
     assert.match(text, /Broad Safe Validation Gate expectations for PR-review fixes: report targeted verification separately from broad safe validation; discover broad candidates from repository-local evidence only; classify candidates by behavior as `local-only`, `approval-bound`, `forbidden`, `unavailable`, `skipped`, `not applicable`, or `mutating-only`; report repository-local discovery evidence, candidate command\(s\) inspected, selected command or unavailable-command conclusion, command classification basis, and freshness evidence for the final candidate worktree\/fix batch/);
     assert.match(text, /include proceed\/block effect, residual risk, and next operator action for any `failed`, `blocked`, `stale`, `skipped`, `not applicable`, or `mutating-only` result/);
     assert.match(text, /For `mutating-only`, require either a separately reported authorized mutating\/output-writing run with dirty-state\/output boundaries, or an accepted residual-risk rationale that explicitly covers not running it/);
-    assert.match(text, /PR creation or preparation readiness also requires Broad Safe Validation Gate evidence when the branch carries those fixes[\s\S]+Apply the `workflow-safety-gates` PR Readiness Evidence Gate status semantics/);
-    assert.match(text, /`skipped` and `not applicable` satisfy readiness only with the full inspected evidence package and policy\/risk basis/);
-    assert.match(text, /`mutating-only` is not a pass; it satisfies readiness only with that full package plus either separately reported authorized mutating\/output-writing command results with dirty-state\/output boundaries, or an accepted residual-risk rationale explicitly covering not running it/);
-    assert.match(text, /Broad Safe Validation Gate status when PR-review fixes are in scope: targeted verification status; broad safe validation status \(`passed`\/`failed`\/`blocked`\/`skipped`\/`not applicable`\/`mutating-only`\); repository-local discovery evidence; candidate command\(s\) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree\/fix batch; proceed\/block effect; residual risk; next operator action/);
+    assert.match(prCreation, /Broad Safe Validation Gate Evidence when PR-review fixes are present/);
+    assert.match(prCreation, /failed\/blocked\/stale broad validation/);
+    assert.match(prCreation, /apply the shared Broad Safe Validation Gate Evidence package and `workflow-safety-gates` PR Readiness Evidence Gate status semantics/);
+    assert.match(outputFormat, /Broad Safe Validation Gate Evidence when PR-review fixes are in scope/);
 });
 
 test('builder classifies builder-run PR-review checks or defers broad validation to test agent', async () => {
@@ -1490,20 +1650,16 @@ test('workflow safety gates require read-only remote tools for read-only verific
 
 test('orchestrator applies read-only remote intent gate to readbacks and parallel checks', async () => {
     const text = await read(orchestratorPath);
+    const workflowSafety = sliceBetween(text, '## Workflow Safety Gates', '## Remote MCP Context Boundaries', 'orchestrator condensed workflow safety gates');
 
-    assert.match(text, /Remote Read-Only Tool Intent Gate/);
-    assert.match(text, /Before any GitHub or Linear read-only remote verification, sanity check, metadata read, metadata readback, or remote-check batch, including pre-mutation and post-mutation reads, apply the Remote Read-Only Tool Intent Gate/);
-    assert.match(text, /Read-only remote verification must use tools or methods that are read-only by primary purpose/);
-    assert.match(text, /`get_\*`, `list_\*`, `read`, `search`, PR\/status metadata reads, and `pull_request_read` methods such as `get_review_comments`, `get_reviews`, and `get_comments` remain allowed when the operation is read-only/);
-    assert.match(text, /Parallel remote checks may batch only tools and methods that are read-only by primary purpose/);
+    assert.match(workflowSafety, /Remote Read-Only Tool Intent Gate/);
+    assert.match(workflowSafety, /GitHub\/Linear metadata read, sanity check, readback, or parallel remote-check batch/);
+    assert.match(workflowSafety, /Read-only tool\/method selection by primary purpose/);
+    assert.match(workflowSafety, /`get_\*`, `list_\*`, `read`, `search`, PR\/status metadata reads, and `pull_request_read` methods such as `get_review_comments`, `get_reviews`, and `get_comments`/);
+    assert.match(workflowSafety, /mixed read\/write parallel batch/);
     assert.match(text, /For PR review-comment workflow read-only remote verification, sanity checks, metadata reads\/readbacks, or remote-check batches, apply the canonical `workflow-safety-gates` Remote Read-Only Tool Intent Gate/);
     assert.match(text, /Use read-only PR review, issue, repository, status, or Linear metadata tools or methods by primary purpose for those reads; do not use mutation-primary tools or methods as sanity checks or read-only verification/);
-    assert.match(text, /For PR creation preparation reads and post-creation sanity readbacks, apply the `workflow-safety-gates` Remote Read-Only Tool Intent Gate before any PR metadata read/);
-    assert.match(text, /`pull_request_read`-style reads/);
-    assert.match(text, /PR\/status metadata reads remain allowed when their operation is read-only/);
-    assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools as sanity checks/);
-    assert.match(text, /Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools for the readback/);
-    assert.equal(text.match(/Do not use mutation-primary review-write, add, reply, comment-writing, thread-resolution, approve, request_changes, dismiss, close, reopen, assign, label, status-changing, resolve, unresolve, submit, delete, create, update, merge, push, write, or other mutation-capable tools as sanity checks/g)?.length, 1);
+    assert.match(workflowSafety, /Mutation-primary review-write, add\/reply\/comment, resolve\/unresolve, approve\/request_changes\/dismiss, status-changing, create\/update\/delete\/merge\/push\/write/);
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
@@ -1517,14 +1673,12 @@ test('orchestrator and prompt require first-round pre-push adversarial status wi
         assert.match(text, /Pre-push adversarial review status/, `${path} exposes operator-facing status`);
     }
 
-    const orchestrator = await read(orchestratorPath);
-    assert.match(orchestrator, /`Execution status`: one of `completed`, `skipped`, `blocked`, `not applicable`/);
-    assert.match(orchestrator, /`Verdict`: one of `BLOCK`, `CONCERNS`, `CLEAN`, `defer to prior adversarial review`/);
-    assert.match(orchestrator, /`Verdict: BLOCK` blocks push\/PR readiness even with `Execution status: completed`/);
-    assert.match(orchestrator, /Execution-status values are NEVER placed directly in the Verdict field/);
-    assert.match(orchestrator, /`Verdict: not produced \(execution status: <execution-status>\)`/);
-    assert.doesNotMatch(orchestrator, /verdict is (?:skipped|blocked|not applicable)/i);
-    assert.doesNotMatch(orchestrator, /when verdict is `(?:skipped|blocked|not applicable)`/i);
+    const outputContract = await read(outputFormatContractPath);
+    assert.match(outputContract, /Execution status[\s\S]+`completed`, `skipped`, `blocked`, or `not applicable`/);
+    assert.match(outputContract, /Verdict[\s\S]+`BLOCK`, `CONCERNS`, `CLEAN`, `defer to prior adversarial review`/);
+    assert.match(outputContract, /Verdict: not produced \(execution status: <execution-status>\)/);
+    assert.doesNotMatch(outputContract, /verdict is (?:skipped|blocked|not applicable)/i);
+    assert.doesNotMatch(outputContract, /when verdict is `(?:skipped|blocked|not applicable)`/i);
 });
 
 test('workflow entrypoints propagate first-round non-trivial pre-push review status', async () => {
@@ -1709,7 +1863,8 @@ test('orchestrator Output Format reports canonical PR template status vocabulary
     const text = await read(orchestratorPath);
     const output = sliceFrom(text, '## Output Format', 'orchestrator output format section');
 
-    assert.match(output, /PR template status when PR creation happens: one of/);
+    assert.match(output, /PR Template and Body Status when PR creation or PR-ready body preparation happens/);
+    assert.match(output, /PR template status uses the shared vocabulary/);
     assertPrTemplateStatuses(output, 'orchestrator PR template status output');
 });
 
@@ -1792,8 +1947,8 @@ test('workflow safety PR Body Audit Gate is canonical for all PR body paths', as
     assert.match(auditGate, /The final output separates the reviewer-facing body from operator-facing notes/);
     assert.match(auditGate, /blocks `mcp_github_create_pull_request` and blocks PR-ready body publication/);
 
-    assert.match(orchestrator, /apply the `workflow-safety-gates` PR Body Audit Gate to the complete candidate body/);
-    assert.match(orchestrator, /do not create the PR and do not publish the PR-ready body until the body is repaired and re-audited/);
+    assert.match(orchestrator, /failed\/blocked PR Body Audit Gate/);
+    assert.match(orchestrator, /`workflow-safety-gates` PR Template Gate, PR Body Audit Gate, PR Readiness Evidence Gate/);
     assert.match(linear, /apply the `workflow-safety-gates` PR Body Audit Gate to the complete candidate body/);
     assert.match(linear, /before calling `mcp_github_create_pull_request` or publishing any PR-ready body/);
     assert.match(prReviewIntegration, /explicit PR description update requests and final PR-body refreshes as PR-body composition\/publication paths/);
@@ -1863,7 +2018,8 @@ test('Verified non-changes citation rules are inherited by direct PR body paths'
     assert.match(auditGate, /must not cite URLs, off-repo paths, dependency-tree internal source paths/);
     assert.match(auditGate, /Drop the entire invalid item and report the offending citation excerpt to the operator/);
 
-    assert.match(orchestrator, /only when each item satisfies the canonical `workflow-safety-gates` PR Body Audit Gate citation validation/);
+    assert.match(orchestrator, /Verified non-changes may appear in a PR body only when each item satisfies the canonical PR Body Audit Gate citation validation/);
+    assert.match(orchestrator, /Workflow-internal evidence paths, dependency-tree internals, and upstream source line numbers stay in operator-facing output only/);
     assert.match(linear, /`## Verified non-changes` citation validation/);
 });
 
