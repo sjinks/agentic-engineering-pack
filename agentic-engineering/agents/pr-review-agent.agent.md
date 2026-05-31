@@ -9,14 +9,6 @@ tools:
   - github/pull_request_review_write
   - github/add_reply_to_pull_request_comment
   - github.vscode-pull-request-github/resolveReviewThread
-agents:
-  - builder-agent
-  - test-agent
-  - code-reviewer-agent
-  - independent-code-reviewer-agent
-  - security-reviewer-agent
-  - adversary-agent
-  - integrator-agent
 user-invocable: false
 argument-hint: "PR URL or number, repository, branch, review comments, orchestrator-sourced PR context/Round-N/thread data, and any reply/resolve constraints."
 ---
