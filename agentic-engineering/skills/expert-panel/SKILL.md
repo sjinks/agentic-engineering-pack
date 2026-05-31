@@ -66,12 +66,16 @@ Keep the message concise. Handoff log content rules follow the `workflow-safety-
 - Separate required fixes from follow-up improvements.
 
 ## Output Format
+
+Use `agentic-engineering/shared/output-format-contract.md` for shared core fields and reusable evidence packages. Keep expert-panel-specific fields local in this section.
+
 Return:
 - Panel roles used.
-- Handoff log/status.
 - Key findings by role.
 - Decisions made.
 - Required actions.
-- Verification performed or recommended.
-- Pre-push adversarial review status, when evaluated.
-- Residual risks.
+- Handoff log/status: use the shared Handoff log/status field.
+- Verification performed or recommended: use the shared Verification field.
+- Pre-push adversarial review status, when evaluated: use the shared Pre-push Adversarial Review Status package, including `Execution status`, `Verdict`, `Trigger basis`, `Round-N count`, `Round-count source`, `Diff baseline`, `Matched non-trivial class(es)`, `Skip considered`, `Skip rejected evidence`, `Skip accepted evidence`, `Blocking findings count`, `Dedup applied against`, and `Equiv-audit fired`.
+- Residual risks: use the shared Residual risks field.
+- Follow-up: use the shared Follow-up field when operator or workflow action remains.

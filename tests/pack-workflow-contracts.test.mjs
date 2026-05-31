@@ -561,6 +561,32 @@ test('PR review workflow output format references shared output format contract'
     assert.doesNotMatch(outputFormatSection, /Broad Safe Validation Gate: targeted verification status; broad safe validation status/);
 });
 
+test('expert panel output format references shared output contract while preserving panel fields', async () => {
+    const text = await read(expertPanelPath);
+    const outputFormatSection = sliceFrom(text, '## Output Format', 'expert panel output format section');
+
+    assert.match(outputFormatSection, /agentic-engineering\/shared\/output-format-contract\.md/);
+    assert.match(outputFormatSection, /shared core fields and reusable evidence packages/);
+    for (const label of [
+        'Panel roles used',
+        'Key findings by role',
+        'Decisions made',
+        'Required actions',
+    ]) {
+        assert.match(outputFormatSection, new RegExp('- ' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.'), `${label} remains local to expert-panel output`);
+    }
+    for (const sharedField of [
+        'Handoff log/status',
+        'Verification',
+        'Pre-push adversarial review status',
+        'Residual risks',
+        'Follow-up',
+    ]) {
+        assert.match(outputFormatSection, new RegExp(sharedField.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${sharedField} is referenced from the expert-panel output format`);
+    }
+    assert.match(outputFormatSection, /use the shared Pre-push Adversarial Review Status package/);
+});
+
 test('linear workflow output format references shared output format contract', async () => {
     const text = await read(linearSkillPath);
     const outputFormatSection = sliceBetween(text, '## Output Format', '## Linear Comment Audience and Content');
