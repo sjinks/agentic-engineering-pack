@@ -1167,8 +1167,8 @@ test('workflow safety gates approve direct existing-comment replies with separat
     assert.match(allowlistRow, /`commentId: number`/);
     assert.match(allowlistRow, /`body`/);
     assert.match(allowlistRow, /direct replies to existing PR review comments/);
-    assert.match(allowlistRow, /pending-review inline comments/);
-    assert.match(allowlistRow, /new reviews/);
+    assert.match(allowlistRow, /[Pp]ending-review inline comments/);
+    assert.match(allowlistRow, /does not compose new top-level reviews/);
     assert.match(allowlistRow, /Direct Review Comment Reply ID Provenance Gate/);
     assert.match(allowlistRow, /Do not use `mcp_github_add_issue_comment` for PR review feedback/);
 
@@ -1221,19 +1221,19 @@ test('PR review thread context documents direct numeric commentId and narrow htm
     assert.match(text, /Direct reply provenance:[\s\S]+read source, freshness point, exact-comment match basis, unavailable direct numeric field, parsed `html_url` fragment, and direct-vs-fallback disagreement check/);
 });
 
-test('PR review reply-resolve distinguishes direct replies from new review surface', async () => {
+test('PR review reply-resolve restricts replies to direct existing-comment surface only', async () => {
     const replyResolve = await read(prReviewReplyResolvePath);
     const coordinator = await read(prReviewSkillPath);
     const combined = `${replyResolve}\n${coordinator}`;
 
     assert.match(replyResolve, /## Reply Surface Selection/);
-    assert.match(replyResolve, /Direct existing-comment mode posts a reply to an existing PR review comment/);
+    assert.match(replyResolve, /Direct existing-comment mode is the only active reply surface in this pack/);
     assert.match(replyResolve, /mcp_github_add_reply_to_pull_request_comment/);
     assert.match(replyResolve, /`owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`/);
     assert.match(replyResolve, /## Pending Review Lifecycle \(Not Currently Available\)/);
     assert.match(replyResolve, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
     assert.match(replyResolve, /The lifecycle below documents the design but is not an active workflow path/);
-    assert.match(replyResolve, /New-review mode creates new review feedback through the approved review-write surface/);
+    assert.match(replyResolve, /Composing a new top-level review via `mcp_github_pull_request_review_write` method `create` is out of scope for this pack/);
     assert.match(combined, /Direct existing-comment replies require a numeric `commentId` with provenance accepted by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate/);
     assert.doesNotMatch(coordinator, /Pending-review inline comments and new review feedback remain separate surfaces and are not interchangeable with direct existing-comment replies/);
 });
@@ -2042,6 +2042,33 @@ test('pr-review-agent has exact write grants and no read grants', async () => {
     // Content checks for github-context-agent delegation and orchestrator-sourced context
     assert.match(agent, /github-context-agent/i, 'mentions github-context-agent for read delegation');
     assert.match(agent, /orchestrator-sourced|orchestrator coordination/i, 'mentions orchestrator-sourced context');
+});
+
+test('PR review-write contract narrows resolve-only and prefers VS Code extension surface', async () => {
+    const prReviewAgent = await read(prReviewAgentPath);
+    const prCreationAgent = await read(prCreationAgentPath);
+    const orchestrator = await read(orchestratorPath);
+
+    // pr-review-agent: owned ops narrowed to replies + resolution; no new top-level reviews; VS Code preferred, MCP fallback
+    assert.match(prReviewAgent, /Own GitHub PR review write operations: direct replies to existing review comments and thread resolution\./);
+    assert.match(prReviewAgent, /This pack does not compose new top-level reviews/);
+    assert.match(prReviewAgent, /`github\.vscode-pull-request-github\/resolveReviewThread` is the preferred surface for thread resolution\./);
+    assert.match(prReviewAgent, /`github\/pull_request_review_write` is the fallback surface for thread resolution\/unresolution/);
+    assert.match(prReviewAgent, /Other methods on this grant \u2014 including `method=create` for new top-level reviews \u2014 are not used by this pack\./);
+    assert.match(prReviewAgent, /Thread resolution \(preferred\): `github\.vscode-pull-request-github\/resolveReviewThread`/);
+    assert.match(prReviewAgent, /Thread resolution \(fallback when the VS Code PR extension surface is unavailable\): `mcp_github_pull_request_review_write`/);
+    assert.doesNotMatch(prReviewAgent, /submit reviews/i);
+
+    // pr-creation-agent: handoff-sourced state, no self-inspection of remote/git
+    assert.match(prCreationAgent, /This agent has no GitHub read or `execute` grants, so remote and git state are taken from the handoff rather than self-inspected\./);
+    assert.match(prCreationAgent, /Confirm pushed-visible status from the orchestrator handoff \(distilled from github-context-agent reads\)/);
+    assert.match(prCreationAgent, /the `mcp_github_create_pull_request` tool's own error response is the fallback failure surface/);
+    assert.doesNotMatch(prCreationAgent, /conflicts with current repository state/i);
+    assert.doesNotMatch(prCreationAgent, /conflicts with current read-only repository state/i);
+
+    // orchestrator: pr-review-agent ownership phrase narrowed; no "review submission" assignment
+    assert.match(orchestrator, /`pr-review-agent` for PR review write operations \(direct replies to existing review threads and thread resolution; this pack does not compose new top-level reviews\)/);
+    assert.doesNotMatch(orchestrator, /review replies, review submission, and thread resolution/i);
 });
 
 test('workflow-safety-gates describes three-specialist GitHub split', async () => {

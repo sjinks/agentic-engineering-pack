@@ -29,9 +29,9 @@ Reply to PR review threads and resolve them only after pushed-visible fixes and 
 
 ## Reply Surface Selection
 
-- Direct existing-comment mode posts a reply to an existing PR review comment. Use only `mcp_github_add_reply_to_pull_request_comment` with `owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`, after the Direct Review Comment Reply ID Provenance Gate passes.
-- New-review mode creates new review feedback through the approved review-write surface.
-- If the selected surface's required ID is unavailable, stale, ambiguous, conflicting, or from an unsafe source, block that reply sub-action rather than switching surfaces or probing with a mutating tool.
+- Direct existing-comment mode is the only active reply surface in this pack. Use only `mcp_github_add_reply_to_pull_request_comment` with `owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`, after the Direct Review Comment Reply ID Provenance Gate passes.
+- Composing a new top-level review via `mcp_github_pull_request_review_write` method `create` is out of scope for this pack: the agent answers existing review threads and does not initiate new review feedback.
+- If the required `commentId` is unavailable, stale, ambiguous, conflicting, or from an unsafe source, block that reply sub-action rather than switching surfaces or probing with a mutating tool.
 
 ## Pending Review Lifecycle (Not Currently Available)
 
@@ -47,7 +47,7 @@ Pending-review inline comments are staged draft content, not GitHub-visible post
 
 ## Approved Resolution Surface
 
-Use the exact thread-resolution surface allowed by `workflow-safety-gates`: MCP review-thread resolution or `github.vscode-pull-request-github/resolveReviewThread`, only with a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
+Prefer `github.vscode-pull-request-github/resolveReviewThread` for thread resolution. Fall back to `mcp_github_pull_request_review_write` (`method=resolve_thread`/`method=unresolve_thread`) only when the VS Code PR extension surface is unavailable. Both surfaces require a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
 
 ## Reviewer-Facing Content Gate
 
