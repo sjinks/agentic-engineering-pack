@@ -72,7 +72,7 @@ Return:
 
 - Reply/resolve plan by thread.
 - Reviewer-facing reply text for each thread that will receive a reply, including its evidence mode: fix-backed SHA, touched-file SHA, verified no-change evidence/provenance, disagreement evidence/provenance, or clarification question provenance.
-- Reply surface for each reply: direct existing-comment or new-review feedback; direct existing-comment entries include operator-facing `commentId` provenance status without leaking ID mechanics into reviewer-facing text.
+- Reply surface for each reply: direct existing-comment only in this pack; entries include the operator-facing `commentId` provenance summary required by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate, without leaking ID mechanics into reviewer-facing text.
 - External-content gate result.
 - Reply/resolve execution status by thread.
 - Partial failure buckets with counts and real thread IDs.

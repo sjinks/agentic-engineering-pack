@@ -2048,6 +2048,13 @@ test('PR review-write contract narrows resolve-only and prefers VS Code extensio
     const prReviewAgent = await read(prReviewAgentPath);
     const prCreationAgent = await read(prCreationAgentPath);
     const orchestrator = await read(orchestratorPath);
+    const replyResolve = await read(prReviewReplyResolvePath);
+
+    // pr-review-reply-resolve Output Contract reply-surface entry must not advertise "new-review feedback"
+    assert.match(replyResolve, /Reply surface for each reply: direct existing-comment only in this pack/);
+    assert.match(replyResolve, /entries include the operator-facing `commentId` provenance summary required by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate/);
+    const replyResolveOutputContractSlice = replyResolve.match(/## Output Contract[\s\S]*$/)?.[0] ?? '';
+    assert.doesNotMatch(replyResolveOutputContractSlice, /new[- ]?review feedback/i);
 
     // pr-review-agent: owned ops narrowed to replies + resolution; no new top-level reviews; VS Code preferred, MCP fallback
     assert.match(prReviewAgent, /Own GitHub PR review write operations: direct replies to existing review comments and thread resolution\./);
