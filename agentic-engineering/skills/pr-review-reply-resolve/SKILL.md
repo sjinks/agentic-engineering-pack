@@ -16,7 +16,6 @@ Reply to PR review threads and resolve them only after pushed-visible fixes and 
 - Fresh thread/comment IDs came from `pr-review-thread-context` or other real GitHub/VS Code PR extension data.
 - Required reply target and thread node ID are available for the specific sub-action. Direct existing-comment replies require a numeric `commentId` with provenance accepted by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate; thread resolution requires the review thread node ID.
 - Reviewer-facing text passes the `workflow-safety-gates` Externally-Posted Content Gate.
-- For pending-review mode, the pending-review ID and submission event are available before staging inline comments.
 
 ## Reply Before Resolve
 
@@ -26,28 +25,29 @@ Reply to PR review threads and resolve them only after pushed-visible fixes and 
 - For verified no-change, disagreement, and clarification replies that are not fix-backed and do not correspond to touched cited files or regions, cite the evidence/provenance for the decision and do not require or invent a fix commit SHA.
 - Thread classification does not exempt a touched file/region from the evidence reply; invalid, out-of-scope, and needs-clarification threads still require the reply when the pushed diff touched the cited file or region.
 - A top-level review submission body, batch summary, outdated status, or resolution call does not substitute for the per-thread evidence reply.
-- Resolve only with the actual review thread node ID. Reply only with the actual per-comment reply/database ID required by the selected reply surface. Direct existing-comment replies use `mcp_github_add_reply_to_pull_request_comment` with params `owner`, `repo`, `pullNumber`, `commentId: number`, and `body`; pending-review inline comments and new review feedback use their separate approved surfaces.
+- Resolve only with the actual review thread node ID. Reply only with the actual per-comment reply/database ID required by the selected reply surface. Direct existing-comment replies use `mcp_github_add_reply_to_pull_request_comment` with params `owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`.
 
 ## Reply Surface Selection
 
-- Direct existing-comment mode posts a reply to an existing PR review comment. Use only `mcp_github_add_reply_to_pull_request_comment` with `owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`, after the Direct Review Comment Reply ID Provenance Gate passes.
-- Pending-review mode stages inline comments into a pending review and does not post evidence until submission succeeds and visibility is confirmed.
-- New-review mode creates new review feedback through the approved review-write surface. Do not use direct existing-comment mode for new review feedback, and do not use pending-review mode as evidence until the pending review is submitted and confirmed.
-- If the selected surface's required ID is unavailable, stale, ambiguous, conflicting, or from an unsafe source, block that reply sub-action rather than switching surfaces or probing with a mutating tool.
+- Direct existing-comment mode is the only active reply surface in this pack. Use only `mcp_github_add_reply_to_pull_request_comment` with `owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`, after the Direct Review Comment Reply ID Provenance Gate passes.
+- Composing a new top-level review via `mcp_github_pull_request_review_write` method `create` is out of scope for this pack: the agent answers existing review threads and does not initiate new review feedback.
+- If the required `commentId` is unavailable, stale, ambiguous, conflicting, or from an unsafe source, block that reply sub-action rather than switching surfaces or probing with a mutating tool.
 
-## Pending Review Lifecycle
+## Pending Review Lifecycle (Not Currently Available)
+
+Pending-review inline comments (`mcp_github_add_pull_request_review_comment_to_pending_review`) are not currently granted to any agent in this pack. The lifecycle below documents the design but is not an active workflow path. If pending-review inline support is restored in the future, the following rules apply:
 
 Pending-review inline comments are staged draft content, not GitHub-visible posted evidence. Treat them as posted per-thread evidence only after submit-pending-review succeeds and the submitted review/comment visibility is confirmed from the tool result or a fresh read. Staging a pending inline comment, receiving a pending comment ID, or composing a top-level review body is not enough to resolve the thread.
 
 - In direct-reply mode, a successful per-thread reply creation can satisfy the posted-evidence prerequisite for that thread.
 - In pending-review mode, reply creation and pending-review submission are separate sub-actions. Do not collapse them into `reply+resolve`.
-- If pending-review submission fails, is skipped, returns an ambiguous result, or cannot be confirmed as GitHub-visible, stop before resolution and classify the affected threads as `pending-submit-failed` or `pending-submit-unconfirmed`.
-- If the Externally-Posted Content Gate rejects any pending-review inline comment or review body, do not submit the pending review. Rejected content is not submitted. If any rejected content was already staged, delete or abandon that pending review before any thread resolution. Report the operator-facing state as blocked or abandoned; do not post the rejected content and do not resolve affected threads.
+- If pending-review submission fails, is skipped, returns an ambiguous result, or cannot be confirmed as GitHub-visible, stop before resolution and report each affected thread as `blocked` with an operator-facing reason. If the failure happened before any per-thread reply or pending-review creation was attempted, report the affected thread as `untouched` with the reason instead.
+- If the Externally-Posted Content Gate rejects any pending-review inline comment or review body, do not submit the pending review. Rejected content is not submitted. If any rejected content was already staged, discard that pending review before any thread resolution when an approved future workflow provides that cleanup path. Report affected threads as `blocked` with an operator-facing reason; do not post the rejected content and do not resolve affected threads.
 - Resolution may proceed for a pending-review thread only after the corresponding pending inline comment is confirmed posted and all other resolution prerequisites still pass.
 
 ## Approved Resolution Surface
 
-Use the exact thread-resolution surface allowed by `workflow-safety-gates`: MCP review-thread resolution or `github.vscode-pull-request-github/resolveReviewThread`, only with a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
+Prefer `github.vscode-pull-request-github/resolveReviewThread` for thread resolution. Fall back to `mcp_github_pull_request_review_write` (`method=resolve_thread`/`method=unresolve_thread`) only when the VS Code PR extension surface is unavailable. Both surfaces require a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
 
 ## Reviewer-Facing Content Gate
 
@@ -58,15 +58,13 @@ Reviewer-facing replies must describe only the code/doc/test change, verified no
 Process reply-then-resolve pairs conservatively:
 
 - `reply+resolve`: reply succeeded and resolution succeeded.
-- `pending-staged`: pending-review inline comment was staged but submit-pending-review has not succeeded and been confirmed; this is not posted evidence.
-- `pending-submit-failed`: pending-review inline comment was staged, but submission failed; do not resolve.
-- `pending-submit-unconfirmed`: pending-review submission result was missing, ambiguous, or not visibility-confirmed; do not resolve.
 - `reply-only`: reply succeeded and resolution failed; do not retry the reply without explicit operator approval.
-- `abandoned`: pending review was deleted or abandoned because content was rejected or the operator rejected submission; do not resolve unless a fresh valid reply is later posted.
 - `untouched`: reply was not attempted because a prerequisite or earlier sub-action failed.
-- `blocked`: missing real reply ID, missing direct reply `commentId`, rejected `commentId` provenance, missing real thread ID, missing pending-review ID, missing pushed-visible evidence, gatekeeper not passed/skipped, external-content gate failure, unsubmitted or unconfirmed pending review, required abandon/delete not completed, or unavailable exact surface.
+- `blocked`: missing real reply ID, missing direct reply `commentId`, rejected `commentId` provenance, missing real thread ID, or unavailable exact surface.
 
-On the first per-thread reply, pending-review submit, abandon/delete, or resolve failure, stop the loop and report counts plus thread IDs in each bucket. Do not issue duplicate replies or submit duplicate pending reviews as automatic recovery.
+These four bucket names are the active bucket set and the source of truth for reporting. When pending-review inline support is not granted, do not introduce pending-review-specific bucket names; map pending-review failures to `blocked` or `untouched` with operator-facing reasons.
+
+On the first per-thread reply or resolve failure, stop the loop and report counts plus thread IDs in each bucket. Do not issue duplicate replies as automatic recovery.
 
 ## Output Contract
 
@@ -74,9 +72,8 @@ Return:
 
 - Reply/resolve plan by thread.
 - Reviewer-facing reply text for each thread that will receive a reply, including its evidence mode: fix-backed SHA, touched-file SHA, verified no-change evidence/provenance, disagreement evidence/provenance, or clarification question provenance.
-- Reply surface for each reply: direct existing-comment, pending-review inline, or new-review feedback; direct existing-comment entries include operator-facing `commentId` provenance status without leaking ID mechanics into reviewer-facing text.
+- Reply surface for each reply: direct existing-comment only in this pack; entries include the operator-facing `commentId` provenance summary required by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate, without leaking ID mechanics into reviewer-facing text.
 - External-content gate result.
-- Pending-review lifecycle status when pending-review mode is used: staged, submitted-confirmed, submit-failed, submit-unconfirmed, blocked, or abandoned, with operator-facing reasons.
 - Reply/resolve execution status by thread.
 - Partial failure buckets with counts and real thread IDs.
 - Threads intentionally not replied to or not resolved, with operator-facing reasons.

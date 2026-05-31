@@ -7,7 +7,7 @@ user-invocable: false
 
 # PR Review Fix Cycle
 
-Coordinate implementation and verification for validated PR review comments. This skill owns the local fix cycle contract; GitHub context and mutation remain orchestrator-owned.
+Coordinate implementation and verification for validated PR review comments. This skill owns the local fix cycle contract; GitHub context acquisition is handled by `github-context-agent`, while GitHub mutations are delegated to `pr-review-agent`.
 
 ## Builder/Test Contract
 
