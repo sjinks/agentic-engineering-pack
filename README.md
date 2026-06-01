@@ -39,6 +39,9 @@ By default, output is written to `dist/agentic-engineering-pack`. Prompt files i
 | Path | Purpose |
 | --- | --- |
 | `.github/agents/agentic-engineering-orchestrator.agent.md` | Coordinates specialist agents, owns workflow synthesis and direct Linear authority, and delegates GitHub work to role agents. |
+| `.github/agents/github-context-agent.agent.md` | Performs read-only GitHub PR/context/Round-N/review-thread reads for orchestrator handoffs. |
+| `.github/agents/pr-creation-agent.agent.md` | Creates GitHub PRs after readiness evidence is present. |
+| `.github/agents/pr-review-agent.agent.md` | Posts PR review replies and resolves review threads with orchestrator-sourced context. |
 | `.github/agents/vault-context-agent.agent.md` | Retrieves narrow read-only Obsidian vault context and returns distilled summaries with provenance and read/not-read boundaries. |
 | `.github/agents/research-agent.agent.md` | Gathers public external facts from docs, standards, release notes, advisories, and vendor or package documentation. |
 | `.github/agents/environment-inspector-agent.agent.md` | Performs read-only local tooling, package script, dependency tree, toolchain, and repository state/history reconnaissance. |
@@ -81,7 +84,7 @@ The pack uses minimal permissions per role.
 | Agent | Tools |
 | --- | --- |
 | Orchestrator | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*` |
-| GitHub Context Agent | read-only GitHub grants including `github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`, and exact repository/issue/search metadata reads |
+| GitHub Context Agent | `read`, `search`, read-only GitHub grants including `github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`, and exact repository/issue/search metadata reads |
 | PR Creation Agent | `read`, `github/create_pull_request` |
 | PR Review Agent | `read`, `search`, `agent`, `vscode/askQuestions`, `github/pull_request_review_write`, `github/add_reply_to_pull_request_comment`, `github.vscode-pull-request-github/resolveReviewThread` |
 | Vault Context | exact `obsidian/...` read-only grants: `obsidian/search_vault`, `obsidian/search_vault_simple`, `obsidian/search_vault_smart`, `obsidian/get_vault_file`, `obsidian/get_vault_file_partial`, `obsidian/get_files_by_tag`, `obsidian/get_backlinks`, `obsidian/get_outgoing_links`, `obsidian/list_vault_files`, `obsidian/get_server_info` |

@@ -93,9 +93,9 @@ It does not produce a VSIX or Marketplace extension package.
 | Agent | Responsibility | Tool Class |
 | --- | --- | --- |
 | [Orchestrator](../../.github/agents/agentic-engineering-orchestrator.agent.md) | Coordinates workflow, delegates to specialists, ensures gates and verification, owns direct Linear authority, and delegates GitHub work to role agents. | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*` |
-| [GitHub Context Agent](../../.github/agents/github-context-agent.agent.md) | Performs read-only GitHub PR/context/Round-N/review-thread reads for orchestrator handoffs. | Exact read-only GitHub grants, including `github/pull_request_read` and `github.vscode-pull-request-github/activePullRequest` |
+| [GitHub Context Agent](../../.github/agents/github-context-agent.agent.md) | Performs read-only GitHub PR/context/Round-N/review-thread reads for orchestrator handoffs. | `read`, `search`, exact read-only GitHub grants, including `github/pull_request_read` and `github.vscode-pull-request-github/activePullRequest` |
 | [PR Creation Agent](../../.github/agents/pr-creation-agent.agent.md) | Creates GitHub PRs after readiness evidence is present. | `read`, `github/create_pull_request` |
-| [PR Review Agent](../../.github/agents/pr-review-agent.agent.md) | Posts PR review replies and resolves review threads with orchestrator-sourced context. | Exact GitHub review-write grants |
+| [PR Review Agent](../../.github/agents/pr-review-agent.agent.md) | Posts PR review replies and resolves review threads with orchestrator-sourced context. | `read`, `search`, `agent`, `vscode/askQuestions`, exact GitHub review-write grants |
 | [Vault Context](../../.github/agents/vault-context-agent.agent.md) | Retrieves narrow read-only Obsidian vault context and returns distilled summaries with provenance and read/not-read boundaries. | Exact Obsidian read-only tools only |
 | [Research](../../.github/agents/research-agent.agent.md) | Gathers external public facts from orchestrator-provided context when repository context is insufficient. | `web` |
 | [Environment Inspector](../../.github/agents/environment-inspector-agent.agent.md) | Performs read-only local tooling, package script, dependency tree, toolchain, and repository state/history reconnaissance. | `read`, `search`, `execute` |
@@ -361,9 +361,9 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 - Constraint: Does not edit production/test code directly; must verify delegated edits independently. `linear/*` remains owned by the orchestrator because namespace-level MCP grants include mutation tools and are not a hard read-only boundary. GitHub PR context acquisition, review-thread reads, active PR context, Round-N computation, PR creation, direct replies, and thread resolution all pass through `workflow-safety-gates` and the role-agent boundaries before use.
 
 **GitHub Role-Agent Tier** (Exact Grants)
-- `github-context-agent`: read-only GitHub PR/context/Round-N/thread reads, including `github/pull_request_read` and `github.vscode-pull-request-github/activePullRequest`.
+- `github-context-agent`: `read`, `search`, and read-only GitHub PR/context/Round-N/thread reads, including `github/pull_request_read` and `github.vscode-pull-request-github/activePullRequest`.
 - `pr-creation-agent`: PR creation only through `github/create_pull_request`; no GitHub reads.
-- `pr-review-agent`: review replies and thread resolution through exact review-write grants; no GitHub reads.
+- `pr-review-agent`: `read`, `search`, `agent`, `vscode/askQuestions`, and review replies/thread resolution through exact review-write grants; no GitHub reads.
 
 **Vault Context Tier** (Exact Read-Only Obsidian Context)
 - Tools: frontmatter grants use `obsidian/search_vault`, `obsidian/search_vault_simple`, `obsidian/search_vault_smart`, `obsidian/get_vault_file`, `obsidian/get_vault_file_partial`, `obsidian/get_files_by_tag`, `obsidian/get_backlinks`, `obsidian/get_outgoing_links`, `obsidian/list_vault_files`, and `obsidian/get_server_info`; prose and runtime references use the matching `mcp_obsidian_...` protocol/tool names.
