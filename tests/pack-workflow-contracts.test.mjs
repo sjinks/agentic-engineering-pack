@@ -8,34 +8,33 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const linearSkillPath = '.github/skills/linear-issue-workflow/SKILL.md';
-const linearPromptPath = '.github/prompts/run-linear-issue-workflow.prompt.md';
+const linearSkillPath = 'agentic-engineering/skills/linear-issue-workflow/SKILL.md';
 const docsPath = 'agentic-engineering/docs/README.md';
 const rootReadmePath = 'README.md';
 const outputFormatContractPath = 'agentic-engineering/shared/output-format-contract.md';
-const prReviewSkillPath = '.github/skills/pr-review-comments-workflow/SKILL.md';
-const prReviewThreadContextPath = '.github/skills/pr-review-thread-context/SKILL.md';
-const prReviewCommentValidationPath = '.github/skills/pr-review-comment-validation/SKILL.md';
-const prReviewFixCyclePath = '.github/skills/pr-review-fix-cycle/SKILL.md';
-const prReviewRoundClosurePath = '.github/skills/pr-review-round-closure/SKILL.md';
-const prReviewReplyResolvePath = '.github/skills/pr-review-reply-resolve/SKILL.md';
-const testGapSkillPath = '.github/skills/test-gap-to-test-plan/SKILL.md';
-const workflowSafetyGatesPath = '.github/skills/workflow-safety-gates/SKILL.md';
-const orchestratorPath = '.github/agents/agentic-engineering-orchestrator.agent.md';
-const runAgenticPromptPath = '.github/prompts/run-agentic-engineering.prompt.md';
-const expertPanelPath = '.github/skills/expert-panel/SKILL.md';
-const pullRequestDescriptionPath = '.github/skills/pull-request-description/SKILL.md';
-const prDescriptionTemplatePolicyPath = '.github/skills/pr-description-template-policy/SKILL.md';
-const prDescriptionBodyAuditPath = '.github/skills/pr-description-body-audit/SKILL.md';
-const adversarialReviewPath = '.github/skills/adversarial-review/SKILL.md';
-const adversaryAgentPath = '.github/agents/adversary-agent.agent.md';
-const independentReviewerPath = '.github/agents/independent-code-reviewer-agent.agent.md';
-const reviewCycleGatekeeperPath = '.github/skills/review-cycle-gatekeeper/SKILL.md';
-const testAgentPath = '.github/agents/test-agent.agent.md';
-const builderAgentPath = '.github/agents/builder-agent.agent.md';
-const githubContextAgentPath = '.github/agents/github-context-agent.agent.md';
-const prCreationAgentPath = '.github/agents/pr-creation-agent.agent.md';
-const prReviewAgentPath = '.github/agents/pr-review-agent.agent.md';
+const prReviewSkillPath = 'agentic-engineering/skills/pr-review-comments-workflow/SKILL.md';
+const prReviewThreadContextPath = 'agentic-engineering/skills/pr-review-thread-context/SKILL.md';
+const prReviewCommentValidationPath = 'agentic-engineering/skills/pr-review-comment-validation/SKILL.md';
+const prReviewFixCyclePath = 'agentic-engineering/skills/pr-review-fix-cycle/SKILL.md';
+const prReviewRoundClosurePath = 'agentic-engineering/skills/pr-review-round-closure/SKILL.md';
+const prReviewReplyResolvePath = 'agentic-engineering/skills/pr-review-reply-resolve/SKILL.md';
+const testGapSkillPath = 'agentic-engineering/skills/test-gap-to-test-plan/SKILL.md';
+const workflowSafetyGatesPath = 'agentic-engineering/skills/workflow-safety-gates/SKILL.md';
+const orchestratorPath = 'agentic-engineering/agents/agentic-engineering-orchestrator.agent.md';
+const expertPanelPath = 'agentic-engineering/skills/expert-panel/SKILL.md';
+const pullRequestDescriptionPath = 'agentic-engineering/skills/pull-request-description/SKILL.md';
+const prDescriptionTemplatePolicyPath = 'agentic-engineering/skills/pr-description-template-policy/SKILL.md';
+const prDescriptionBodyAuditPath = 'agentic-engineering/skills/pr-description-body-audit/SKILL.md';
+const adversarialReviewPath = 'agentic-engineering/skills/adversarial-review/SKILL.md';
+const adversaryAgentPath = 'agentic-engineering/agents/adversary-agent.agent.md';
+const independentReviewerPath = 'agentic-engineering/agents/independent-code-reviewer-agent.agent.md';
+const reviewCycleGatekeeperPath = 'agentic-engineering/skills/review-cycle-gatekeeper/SKILL.md';
+const testAgentPath = 'agentic-engineering/agents/test-agent.agent.md';
+const builderAgentPath = 'agentic-engineering/agents/builder-agent.agent.md';
+const gitOperatorAgentPath = 'agentic-engineering/agents/git-operator-agent.agent.md';
+const githubContextAgentPath = 'agentic-engineering/agents/github-context-agent.agent.md';
+const prCreationAgentPath = 'agentic-engineering/agents/pr-creation-agent.agent.md';
+const prReviewAgentPath = 'agentic-engineering/agents/pr-review-agent.agent.md';
 const prReviewFocusedSkillPaths = [
     prReviewThreadContextPath,
     prReviewCommentValidationPath,
@@ -247,9 +246,9 @@ async function workflowSafetyReferenceMarkdownPaths() {
         'agentic-engineering/docs',
         'agentic-engineering/shared',
         'docs/agentic',
-        '.github/skills',
-        '.github/agents',
-        '.github/prompts',
+        'agentic-engineering/skills',
+        'agentic-engineering/agents',
+        'agentic-engineering/prompts',
     ];
     const paths = [...directPaths];
     for (const root of roots) {
@@ -419,10 +418,10 @@ async function assertTreeByteIdentical(packRoot, sourceRoot) {
     }
 }
 
-test('.github agent and skill pack surfaces resolve to source or remain byte-identical', async () => {
+test('agentic-engineering agent and skill pack surfaces resolve to source or remain byte-identical', async () => {
     for (const [packRoot, sourceRoot] of [
-        ['.github/agents', 'agentic-engineering/agents'],
-        ['.github/skills', 'agentic-engineering/skills'],
+        ['agentic-engineering/agents', 'agentic-engineering/agents'],
+        ['agentic-engineering/skills', 'agentic-engineering/skills'],
     ]) {
         const [packStat, sourceStat, packRealPath, sourceRealPath] = await Promise.all([
             lstat(packRoot),
@@ -454,24 +453,6 @@ test('Linear skill orders commit hygiene, push visibility, gatekeeper, then PR c
     assert.ok(gatekeeper > push, 'gatekeeper follows push');
     assert.ok(prCreation > gatekeeper, 'PR creation follows gatekeeper');
     assert.doesNotMatch(text, /before push, invoke `review-cycle-gatekeeper`/);
-});
-
-test('Linear prompt orders push visibility before gatekeeper and PR creation', async (t) => {
-    if (!(await exists(linearPromptPath))) {
-        t.skip(`${linearPromptPath} is intentionally absent`);
-        return;
-    }
-
-    const text = await read(linearPromptPath);
-    const commitHygiene = text.indexOf('6. **Inspect and clean commit history**');
-    const push = text.indexOf('7. **Push and confirm remote visibility**');
-    const gatekeeper = text.indexOf('8. **Run the review closure gatekeeper.**');
-    const prCreation = text.indexOf('9. **Create a GitHub PR**');
-
-    assert.ok(commitHygiene >= 0, 'commit hygiene step is present');
-    assert.ok(push > commitHygiene, 'push follows commit hygiene');
-    assert.ok(gatekeeper > push, 'gatekeeper follows push');
-    assert.ok(prCreation > gatekeeper, 'PR creation follows gatekeeper');
 });
 
 test('PR review workflow orders push visibility, fresh thread snapshot, gatekeeper, then replies and resolution', async () => {
@@ -903,9 +884,9 @@ test('generated plugin includes real guide docs at the README guide link target'
         const generatedOutputFormatContract = pathWithin(outputRoot, outputFormatContractPath);
         const generatedLinearSkill = await read(pathWithin(outputRoot, 'skills/linear-issue-workflow/SKILL.md'));
 
-        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\.github\/agents\//, 'source guide keeps repository-relative agent links');
-        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\.github\/skills\//, 'source guide keeps repository-relative skill links');
-        assert.doesNotMatch(generatedGuide, /\]\(\.\.\/\.\.\/\.github\/(agents|skills|prompts)\//, 'generated guide does not link to repository .github surfaces');
+        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\agentic-engineering\/agents\//, 'source guide keeps repository-relative agent links');
+        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\agentic-engineering\/skills\//, 'source guide keeps repository-relative skill links');
+        assert.doesNotMatch(generatedGuide, /\]\(\.\.\/\.\.\/\agentic-engineering\/(agents|skills|prompts)\//, 'generated guide does not link to repository agentic-engineering surfaces');
         assert.ok(generatedAgentLinks.length > 0, 'generated guide has package-local agent links');
         assert.ok(generatedSkillLinks.length > 0, 'generated guide has package-local skill links');
         assert.equal(await exists(generatedOutputFormatContract), true, 'generated package includes shared output format contract');
@@ -1144,22 +1125,20 @@ test('PR review reply-resolve focused skill requires reply before resolve and pa
     assert.match(text, /On the first per-thread reply or resolve failure, stop the loop/);
 });
 
-test('pending-review inline comment tool is intentionally not granted in this pack', async () => {
+test('PR review workflows use only direct existing-comment replies', async () => {
     const safety = await read(workflowSafetyGatesPath);
     const prReviewSkill = await read(prReviewSkillPath);
     const replyResolve = await read(prReviewReplyResolvePath);
     const prReviewAgent = await read(prReviewAgentPath);
     const combined = `${safety}\n${prReviewSkill}\n${replyResolve}\n${prReviewAgent}`;
 
-    assert.match(safety, /`mcp_github_add_pull_request_review_comment_to_pending_review` is not currently granted to any agent in this pack/);
-    assert.match(prReviewSkill, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
-    assert.match(prReviewAgent, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
-    assert.match(replyResolve, /## Pending Review Lifecycle \(Not Currently Available\)/);
-    assert.match(replyResolve, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
-    assert.match(replyResolve, /The lifecycle below documents the design but is not an active workflow path/);
+    assert.match(safety, /This pack does not compose new top-level reviews or pending-review inline comments/);
+    assert.match(prReviewSkill, /Workflows use only direct existing-comment replies/);
+    assert.match(replyResolve, /Direct existing-comment mode is the only active reply surface in this pack/);
     assert.doesNotMatch(safety, /`mcp_github_add_pull_request_review_comment_to_pending_review` for pending-review inline comments;/);
     assert.doesNotMatch(safety, /\| Submit pending pull request review \| Approved/);
     assert.doesNotMatch(safety, /\| Delete pending pull request review \| Approved/);
+    assert.doesNotMatch(combined, /not currently granted in this pack|no agent has this tool/);
 });
 
 test('pending-review submit and delete tools are intentionally absent from the allowlist', async () => {
@@ -1170,15 +1149,13 @@ test('pending-review submit and delete tools are intentionally absent from the a
     assert.doesNotMatch(allowlistSection, /\| Delete pending pull request review \| Approved/);
     assert.doesNotMatch(allowlistSection, /submit_pending_pull_request_review/);
     assert.doesNotMatch(allowlistSection, /delete.*pending.*review/i);
-    assert.match(safety, /Pending-review inline comment tool status: `mcp_github_add_pull_request_review_comment_to_pending_review` is not currently granted/);
+    assert.match(safety, /This pack does not compose new top-level reviews or pending-review inline comments/);
 });
 
 test('pending-review failures map to active partial failure buckets', async () => {
     const replyResolve = await read(prReviewReplyResolvePath);
 
     assert.match(replyResolve, /These four bucket names are the active bucket set and the source of truth for reporting/);
-    assert.match(replyResolve, /When pending-review inline support is not granted, do not introduce pending-review-specific bucket names/);
-    assert.match(replyResolve, /map pending-review failures to `blocked` or `untouched` with operator-facing reasons/);
     assert.doesNotMatch(replyResolve, /`pending-staged`|`pending-submit-failed`|`pending-submit-unconfirmed`|`abandoned`/);
     assert.match(replyResolve, /On the first per-thread reply or resolve failure, stop the loop/);
     assert.doesNotMatch(replyResolve, /On the first per-thread reply, pending-review submit, abandon\/delete, or resolve failure/);
@@ -1306,10 +1283,8 @@ test('workflow safety gates allow exact VS Code PR extension surfaces without br
     assert.match(text, /approved for read-only PR context acquisition/);
     assert.match(text, /github\.vscode-pull-request-github\/resolveReviewThread/);
     assert.match(text, /Real review thread node ID from extension\/GitHub data; pushed-visible addressed state or verified no-change rationale; gatekeeper pass or allowed skip; no mutating probe/);
-    assert.match(text, /GitHub repository file writes are globally denied/);
-    assert.match(text, /mcp_github_create_or_update_file/);
-    assert.match(text, /mcp_github_push_files/);
-    assert.match(text, /mcp_github_delete_file/);
+    assert.match(text, /All other GitHub remote mutations require a future workflow with explicit frontmatter grants, provenance, approval, and rollback\/recovery rules/);
+    assert.doesNotMatch(text, /mcp_github_create_or_update_file|mcp_github_push_files|mcp_github_delete_file/);
 });
 
 test('workflow safety gates approve direct existing-comment replies with separate params and provenance', async () => {
@@ -1327,7 +1302,7 @@ test('workflow safety gates approve direct existing-comment replies with separat
     assert.match(allowlistRow, /[Pp]ending-review inline comments/);
     assert.match(allowlistRow, /does not compose new top-level reviews/);
     assert.match(allowlistRow, /Direct Review Comment Reply ID Provenance Gate/);
-    assert.match(allowlistRow, /Do not use `mcp_github_add_issue_comment` for PR review feedback/);
+    assert.doesNotMatch(allowlistRow, /mcp_github_add_issue_comment/);
 
     assert.match(provenanceSection, /This `commentId` is distinct from the review thread node ID used for resolution/);
     assert.match(provenanceSection, /A direct numeric field from an approved fresh GitHub or VS Code PR extension read for the exact review comment/);
@@ -1387,11 +1362,9 @@ test('PR review reply-resolve restricts replies to direct existing-comment surfa
     assert.match(replyResolve, /Direct existing-comment mode is the only active reply surface in this pack/);
     assert.match(replyResolve, /mcp_github_add_reply_to_pull_request_comment/);
     assert.match(replyResolve, /`owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`/);
-    assert.match(replyResolve, /## Pending Review Lifecycle \(Not Currently Available\)/);
-    assert.match(replyResolve, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
-    assert.match(replyResolve, /The lifecycle below documents the design but is not an active workflow path/);
     assert.match(replyResolve, /Composing a new top-level review via `mcp_github_pull_request_review_write` method `create` is out of scope for this pack/);
     assert.match(combined, /Direct existing-comment replies require a numeric `commentId` with provenance accepted by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate/);
+    assert.doesNotMatch(combined, /mcp_github_add_pull_request_review_comment_to_pending_review|not currently granted in this pack/);
     assert.doesNotMatch(coordinator, /Pending-review inline comments and new review feedback remain separate surfaces and are not interchangeable with direct existing-comment replies/);
 });
 
@@ -1567,7 +1540,7 @@ test('builder classifies builder-run PR-review checks or defers broad validation
 });
 
 test('Linear entrypoints and docs carry no-PR thread-state proof language', async () => {
-    const paths = await existingPaths([linearSkillPath, linearPromptPath, docsPath]);
+    const paths = await existingPaths([linearSkillPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one linear entrypoint/doc path exists');
 
     for (const path of paths) {
@@ -1578,7 +1551,7 @@ test('Linear entrypoints and docs carry no-PR thread-state proof language', asyn
 });
 
 test('Linear entrypoints and docs propagate high-risk agent-pack dual review rule or deference', async () => {
-    const paths = await existingPaths([linearSkillPath, linearPromptPath, docsPath]);
+    const paths = await existingPaths([linearSkillPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one linear entrypoint/doc path exists');
 
     for (const path of paths) {
@@ -1606,17 +1579,15 @@ test('canonical first-round non-trivial adversarial-review definitions are risk-
     assert.match(text, /Shared-module decline cannot override this separate mandatory non-trivial trigger/);
 });
 
-test('workflow safety gates deny Copilot PR creation as fallback or substitute', async () => {
+test('workflow safety gates require the exact approved PR creation path', async () => {
     const text = await read(workflowSafetyGatesPath);
 
     assert.match(text, /PR creation permits only the exact approved PR creation tool for this pack: `mcp_github_create_pull_request`/);
     assert.match(text, /Create pull request \| Approved \| `mcp_github_create_pull_request` only/);
     assert.match(text, /Create pull request \| Approved \| `mcp_github_create_pull_request` only \| [^\n|]*PR Body Audit Gate `pass` or `repaired` for the complete candidate PR body/);
-    assert.match(text, /Never use `mcp_github_create_pull_request_with_copilot` for PR creation in this pack/);
-    assert.match(text, /Copilot PR creation \| Blocked \| `mcp_github_create_pull_request_with_copilot` is denied/);
     assert.match(text, /Host\/tool availability, generic tool descriptions, visible tool schemas, or tool names that appear capable never override this pack allowlist/);
-    assert.match(text, /If local push mechanics, branch publication, or exact PR creation is blocked, unavailable, or fails[\s\S]+stop with a blocked, local-ready, or PR-ready summary\/guidance/);
-    assert.match(text, /^Copilot PR creation is not a recovery path, fallback, or substitute for failed or unavailable local push mechanics, branch publication, repository-file write tooling, or approved PR creation tooling\.$/m);
+    assert.match(text, /If one of those paths is blocked, unavailable, or fails, stop with a blocked, local-ready, or PR-ready summary\/guidance instead of attempting a recovery mutation/);
+    assert.doesNotMatch(text, /mcp_github_create_pull_request_with_copilot/);
 });
 
 test('workflow safety create-PR allowlist row requires audited PR body', async () => {
@@ -1663,7 +1634,7 @@ test('orchestrator applies read-only remote intent gate to readbacks and paralle
 });
 
 test('orchestrator and prompt require first-round pre-push adversarial status with split verdict', async () => {
-    const paths = await existingPaths([orchestratorPath, runAgenticPromptPath]);
+    const paths = await existingPaths([orchestratorPath]);
     assert.ok(paths.length > 0, 'at least one orchestrator/prompt path exists');
 
     for (const path of paths) {
@@ -1682,7 +1653,7 @@ test('orchestrator and prompt require first-round pre-push adversarial status wi
 });
 
 test('workflow entrypoints propagate first-round non-trivial pre-push review status', async () => {
-    const paths = await existingPaths([linearSkillPath, linearPromptPath, prReviewSkillPath, expertPanelPath, docsPath]);
+    const paths = await existingPaths([linearSkillPath, prReviewSkillPath, expertPanelPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one workflow entrypoint path exists');
 
     for (const path of paths) {
@@ -1744,7 +1715,7 @@ test('pre-push output and readiness contexts use canonical adversarial status la
 });
 
 test('push and PR readiness require non-blocking adversarial outcome', async () => {
-    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, linearSkillPath, linearPromptPath, prReviewSkillPath, expertPanelPath]);
+    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, linearSkillPath, prReviewSkillPath, expertPanelPath]);
     assert.ok(paths.length > 0, 'at least one push/PR readiness path exists');
 
     for (const path of paths) {
@@ -1757,7 +1728,7 @@ test('push and PR readiness require non-blocking adversarial outcome', async () 
 });
 
 test('first-round adversarial baseline is cumulative branch diff vs integration branch', async () => {
-    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, runAgenticPromptPath, prReviewSkillPath, docsPath]);
+    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, prReviewSkillPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one baseline path exists');
 
     for (const path of paths) {
@@ -1833,8 +1804,8 @@ test('PR description template policy owns template discovery and operator-facing
     const text = await read(prDescriptionTemplatePolicyPath);
 
     assert.match(text, /aligns with the `workflow-safety-gates` PR Template Gate/);
-    assert.match(text, /\.github\/pull_request_template\.md/);
-    assert.match(text, /\.github\/PULL_REQUEST_TEMPLATE\/\*\.md/);
+    assert.match(text, /\agentic-engineering\/pull_request_template\.md/);
+    assert.match(text, /\agentic-engineering\/PULL_REQUEST_TEMPLATE\/\*\.md/);
     assert.match(text, /If exactly one readable template is found/);
     assert.match(text, /Ambiguity is based on readable templates, not total candidate count/);
     assert.match(text, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);
@@ -2048,7 +2019,7 @@ test('PR body audit section blocks support-skill leakage and partial Verified no
 });
 
 test('synthesis PR body line is emitted only after completed adversarial review', async () => {
-    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, runAgenticPromptPath, prDescriptionBodyAuditPath, docsPath]);
+    const paths = await existingPaths([workflowSafetyGatesPath, orchestratorPath, prDescriptionBodyAuditPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one synthesis path exists');
 
     for (const path of paths) {
@@ -2091,8 +2062,33 @@ test('orchestrator has no GitHub tools and includes github-context-agent, pr-cre
 
     assert.match(orchestrator, /agents:/m, 'orchestrator has agents list');
     assert.match(orchestrator, /- github-context-agent/m, 'orchestrator includes github-context-agent');
+    assert.match(orchestrator, /- git-operator-agent/m, 'orchestrator includes git-operator-agent');
     assert.match(orchestrator, /- pr-creation-agent/m, 'orchestrator includes pr-creation-agent');
     assert.match(orchestrator, /- pr-review-agent/m, 'orchestrator includes pr-review-agent');
+});
+
+test('git-operator-agent owns local git mechanics', async () => {
+    const gitOperator = await read(gitOperatorAgentPath);
+    const orchestrator = await read(orchestratorPath);
+    const builder = await read(builderAgentPath);
+    const testAgent = await read(testAgentPath);
+    const prReviewFixCycle = await read(prReviewFixCyclePath);
+
+    assert.equal(await exists(gitOperatorAgentPath), true, 'git-operator-agent exists');
+    assert.equal(frontmatterValue(gitOperator, 'user-invocable'), 'false', 'git-operator-agent is not user-invocable');
+    assert.equal(frontmatterValue(gitOperator, 'name'), '"git-operator-agent"');
+
+    const frontmatter = gitOperator.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? '';
+    assert.match(frontmatter, /edit/m, 'git-operator-agent can write commit message files');
+    assert.match(frontmatter, /execute/m, 'git-operator-agent can run local git commands');
+    assert.match(gitOperator, /Local Git Mutation Delegation Contract/);
+    assert.match(gitOperator, /Shell-Safe Local Execution/);
+    assert.match(gitOperator, /pushed-visible confirmation/);
+
+    assert.match(orchestrator, /Local git mechanics belong to `git-operator-agent`/);
+    assert.match(builder, /If the change requires local git mutation, route that need to `git-operator-agent`/);
+    assert.match(testAgent, /If local git mutation is needed, route that need to `git-operator-agent`/);
+    assert.match(prReviewFixCycle, /Delegate local branch, staging, commit, amend, cleanup, push, and pushed-visible confirmation mechanics to `git-operator-agent`/);
 });
 
 test('github-context-agent has exact read-only grants and no write grants', async () => {

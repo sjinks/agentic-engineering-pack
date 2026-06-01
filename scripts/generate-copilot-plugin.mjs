@@ -232,6 +232,8 @@ function stripFrontmatter(markdown) {
  */
 function rewriteGuideLinksForPackage(markdown, generatedCommands) {
   return markdown
+    .replaceAll('](../../agentic-engineering/agents/', '](../../agents/')
+    .replaceAll('](../../agentic-engineering/skills/', '](../../skills/')
     .replaceAll('](../../.github/agents/', '](../../agents/')
     .replaceAll('](../../.github/skills/', '](../../skills/')
     .replace(
@@ -349,7 +351,7 @@ async function main() {
   copiedFiles += await copyTreeIfPresent(
     repoRoot,
     outputRoot,
-    '.github/agents',
+    'agentic-engineering/agents',
     'agents',
     manifestContents.agents,
   );
@@ -357,7 +359,7 @@ async function main() {
   copiedFiles += await copyTreeIfPresent(
     repoRoot,
     outputRoot,
-    '.github/skills',
+    'agentic-engineering/skills',
     'skills',
     manifestContents.skills,
   );

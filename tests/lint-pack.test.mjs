@@ -92,15 +92,19 @@ test('walkMarkdownFiles skips missing markdown roots', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'lint-pack-roots-'));
 
     try {
-        await mkdir(join(tempRoot, '.github', 'agents'), { recursive: true });
-        await writeFile(join(tempRoot, '.github', 'agents', 'sample.agent.md'), '# sample\n', 'utf8');
+        await mkdir(join(tempRoot, 'agentic-engineering', 'agents'), { recursive: true });
+        await writeFile(join(tempRoot, 'agentic-engineering', 'agents', 'sample.agent.md'), '# sample\n', 'utf8');
 
         const result = await walkMarkdownFiles(tempRoot);
 
-        assert.deepEqual(result.scannedRoots, ['.github/agents']);
-        assert.deepEqual(result.skippedRoots.sort(), ['.github/prompts', '.github/skills', 'agentic-engineering/shared']);
+        assert.deepEqual(result.scannedRoots, ['agentic-engineering/agents']);
+        assert.deepEqual(result.skippedRoots.sort(), [
+            'agentic-engineering/prompts',
+            'agentic-engineering/shared',
+            'agentic-engineering/skills',
+        ].sort());
         assert.equal(result.files.length, 1);
-        assert.equal(result.files[0].rel, '.github/agents/sample.agent.md');
+        assert.equal(result.files[0].rel, 'agentic-engineering/agents/sample.agent.md');
     }
     finally {
         await rm(tempRoot, { recursive: true, force: true });
@@ -131,7 +135,7 @@ test('walkMarkdownFiles scans markdown files from agentic-engineering/shared', a
 
 test('walkMarkdownFiles throws explicit error when an existing markdown root cannot be traversed', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'lint-pack-roots-'));
-    const skillsRoot = join(tempRoot, '.github', 'skills');
+    const skillsRoot = join(tempRoot, 'agentic-engineering', 'skills');
 
     try {
         await mkdir(skillsRoot, { recursive: true });
@@ -139,7 +143,7 @@ test('walkMarkdownFiles throws explicit error when an existing markdown root can
 
         await assert.rejects(
             walkMarkdownFiles(tempRoot),
-            /Failed to traverse markdown root .*\.github\/skills:/,
+            /Failed to traverse markdown root .*agentic-engineering\/skills:/,
         );
     }
     finally {
