@@ -3,7 +3,7 @@
 /**
  * Lint the agentic engineering pack for known regression classes.
  *
- * Five checks:
+ * Seven checks:
  *  1. Stale numbered cross-references — flags `Gate Rule N` references in
  *     prose outside the canonical `## Gate Rules` numbered list, and `Step N`
  *     references that do not resolve to a numbered step in the same file.
@@ -22,6 +22,13 @@
  *  5. Producer ↔ consumer section-name consistency — flags drift in the
  *     canonical Output Format section names produced by `spec-agent` and
  *     `architect-agent` when referenced verbatim across the pack.
+ *  6. Agent delegation allowlists — any `.agent.md` that grants the `agent`
+ *     tool must include a non-empty `agents:` frontmatter allowlist whose
+ *     entries resolve to known agent basenames. Emits lint reasons
+ *     `LINT_AGENT_MISSING_ALLOWLIST` and `LINT_AGENT_INVALID_DELEGATE`.
+ *  7. Duplicate agent frontmatter — flags `.agent.md` files that start a
+ *     second top-level frontmatter block after the initial YAML block. Emits
+ *     lint reason `LINT_AGENT_DUPLICATE_FRONTMATTER`.
  *
  * Read-only: never writes files, never invokes git, never spawns external
  * processes. Walks only `.github/skills/`, `.github/agents/`, `.github/prompts/`,
@@ -80,6 +87,8 @@ Checks:
   3. Cross-file reference resolution (skill/agent names in backticks + frontmatter).
   4. Orchestrator gate anchors (spec 7a-7d, architecture 9a-9c, Output Format status bullets; rejects neutered anchors).
   5. Producer ↔ consumer section-name consistency (spec-agent and architect-agent Output Format names referenced verbatim across the pack).
+    6. Agent delegation allowlists ('agent' tool requires non-empty 'agents:' allowlist with known delegates).
+    7. Duplicate agent frontmatter blocks (second top-level frontmatter/name block after initial YAML).
 
 Exit codes:
   0  No errors (warnings allowed unless --strict).
@@ -375,6 +384,158 @@ function extractFrontmatterAgentRefs(lines) {
     return refs;
 }
 
+function stripFrontmatterInlineComment(value) {
+    let inSingle = false;
+    let inDouble = false;
+    for (let i = 0; i < value.length; i += 1) {
+        const char = value[i];
+        if (char === "'" && !inDouble) {
+            if (inSingle && value[i + 1] === "'") { i += 1; continue; }
+            inSingle = !inSingle;
+            continue;
+        }
+        if (char === '"' && !inSingle) {
+            let backslashes = 0;
+            for (let j = i - 1; j >= 0 && value[j] === '\\'; j -= 1) backslashes += 1;
+            if (backslashes % 2 === 0) inDouble = !inDouble;
+            continue;
+        }
+        if (char === '#' && !inSingle && !inDouble && (i === 0 || /\s/.test(value[i - 1]))) {
+            return value.slice(0, i).trimEnd();
+        }
+    }
+    return value;
+}
+
+function normalizeFrontmatterScalar(value) {
+    const stripped = stripFrontmatterInlineComment(value).trim();
+    if (stripped.length >= 2) {
+        const first = stripped[0];
+        const last = stripped[stripped.length - 1];
+        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+            return stripped.slice(1, -1).trim();
+        }
+    }
+    return stripped;
+}
+
+function splitFrontmatterInlineArray(value) {
+    const items = [];
+    let start = 0;
+    let inSingle = false;
+    let inDouble = false;
+    for (let i = 0; i < value.length; i += 1) {
+        const char = value[i];
+        if (char === "'" && !inDouble) {
+            if (inSingle && value[i + 1] === "'") { i += 1; continue; }
+            inSingle = !inSingle;
+            continue;
+        }
+        if (char === '"' && !inSingle) {
+            let backslashes = 0;
+            for (let j = i - 1; j >= 0 && value[j] === '\\'; j -= 1) backslashes += 1;
+            if (backslashes % 2 === 0) inDouble = !inDouble;
+            continue;
+        }
+        if (char === ',' && !inSingle && !inDouble) {
+            items.push(value.slice(start, i));
+            start = i + 1;
+        }
+    }
+    items.push(value.slice(start));
+    return items;
+}
+
+function extractFrontmatterListValues(lines, key) {
+    const values = [];
+    if (!lines.length || lines[0].trim() !== '---') return values;
+    let end = -1;
+    for (let i = 1; i < lines.length; i += 1) {
+        if (lines[i].trim() === '---') { end = i; break; }
+    }
+    if (end < 0) return values;
+    const escapedKey = escapeRegExp(key);
+    const keyInline = new RegExp(`^${escapedKey}:\\s*\\[(.*)\\]\\s*(?:#.*)?$`);
+    const keyList = new RegExp(`^${escapedKey}:\\s*$`);
+    for (let i = 1; i < end; i += 1) {
+        const trimmed = lines[i].trim();
+        const inline = keyInline.exec(trimmed);
+        if (inline) {
+            const items = splitFrontmatterInlineArray(inline[1]).map((s) => normalizeFrontmatterScalar(s));
+            for (const item of items) if (item) values.push({ name: item, line: i + 1 });
+            return values;
+        }
+    }
+    let inList = false;
+    for (let i = 1; i < end; i += 1) {
+        const raw = lines[i];
+        if (keyList.test(raw.trim())) { inList = true; continue; }
+        if (!inList) continue;
+        const m = /^\s*-\s*(.*?)\s*$/.exec(raw);
+        if (m) {
+            const item = normalizeFrontmatterScalar(m[1]);
+            if (item) values.push({ name: item, line: i + 1 });
+            continue;
+        }
+        if (/^[A-Za-z0-9_-]+:\s*/.test(raw)) break;
+    }
+    return values;
+}
+
+function checkAgentDelegationAllowlists(files, known) {
+    const findings = [];
+    for (const file of files) {
+        if (!file.rel.endsWith('.agent.md')) continue;
+        const tools = extractFrontmatterListValues(file.lines, 'tools').map((t) => t.name);
+        if (!tools.includes('agent')) continue;
+        const agents = extractFrontmatterListValues(file.lines, 'agents');
+        if (!agents.length) {
+            findings.push({ file: file.rel, line: 1, severity: 'error', reason: 'LINT_AGENT_MISSING_ALLOWLIST: `agent` declared in frontmatter `tools:` but `agents:` allowlist is missing or empty' });
+            continue;
+        }
+        for (const a of agents) {
+            if (!known.agents.has(a.name)) {
+                findings.push({ file: file.rel, line: a.line, severity: 'error', reason: `LINT_AGENT_INVALID_DELEGATE: unknown delegate \`${a.name}\`` });
+            }
+        }
+    }
+    return findings;
+}
+
+function checkDuplicateAgentFrontmatter(files) {
+    const findings = [];
+    for (const file of files) {
+        if (!file.rel.endsWith('.agent.md')) continue;
+        const delimiterLines = [];
+        for (let i = 0; i < file.lines.length; i += 1) {
+            if (file.inCodeBlock[i]) continue;
+            if (file.lines[i] === '---') delimiterLines.push(i);
+        }
+        if (delimiterLines.length <= 2) continue;
+
+        const duplicateStart = delimiterLines[2];
+        const nextDelimiter = delimiterLines[3] ?? file.lines.length;
+        let findingLine = duplicateStart;
+        let detail = '';
+        for (let i = duplicateStart + 1; i < nextDelimiter; i += 1) {
+            if (file.inCodeBlock[i]) continue;
+            if (/^name:\s*/.test(file.lines[i].trim())) {
+                findingLine = i;
+                detail = `; duplicate name line: ${file.lines[i].trim()}`;
+                break;
+            }
+        }
+
+        findings.push({
+            file: file.rel,
+            line: findingLine + 1,
+            severity: 'error',
+            reason: `LINT_AGENT_DUPLICATE_FRONTMATTER: duplicate frontmatter block starts after initial frontmatter${detail}`,
+        });
+    }
+    return findings;
+}
+
 function checkUnresolvedRefs(files, known) {
     const findings = [];
     const allEntities = new Set([...known.skills, ...known.agents]);
@@ -623,7 +784,7 @@ function reportCheck(label, findings, formatter) {
     for (const f of findings) formatter(f);
 }
 
-function printResults(check1, check2, check3, check4, check5, strict, scanStats) {
+function printResults(check1, check2, check3, check4, check5, check6, check7, strict, scanStats) {
     console.log('Pack lint results');
     console.log('=================');
     console.log();
@@ -655,8 +816,18 @@ function printResults(check1, check2, check3, check4, check5, strict, scanStats)
         console.log(`    Reason: ${f.reason}`);
     });
     console.log();
+    reportCheck('Check 6: Agent delegation allowlists', check6, (f) => {
+        const loc = f.line ? `${f.file}:${f.line}` : f.file;
+        console.log(`  ${severitySymbol(f.severity)} ${loc} — ${f.reason}`);
+    });
+    console.log();
+    reportCheck('Check 7: Duplicate agent frontmatter blocks', check7, (f) => {
+        const loc = f.line ? `${f.file}:${f.line}` : f.file;
+        console.log(`  ${severitySymbol(f.severity)} ${loc} — ${f.reason}`);
+    });
+    console.log();
 
-    const all = [...check1, ...check2, ...check3, ...check4, ...check5];
+    const all = [...check1, ...check2, ...check3, ...check4, ...check5, ...check6, ...check7];
     const errors = all.filter((f) => f.severity === 'error').length;
     const warnings = all.filter((f) => f.severity === 'warning').length;
     const issueFiles = new Set(all.map((f) => f.file)).size;
@@ -701,6 +872,8 @@ async function main() {
     const check3 = checkUnresolvedRefs(files, known);
     const check4 = checkOrchestratorSpecGateAnchors(files);
     const check5 = checkSectionNameDrift(files);
+    const check6 = checkAgentDelegationAllowlists(files, known);
+    const check7 = checkDuplicateAgentFrontmatter(files);
 
     process.exit(printResults(
         check1,
@@ -708,6 +881,8 @@ async function main() {
         check3,
         check4,
         check5,
+        check6,
+        check7,
         options.strict,
         {
             scannedFiles: scanResult.files.length,
@@ -725,6 +900,9 @@ export {
     stripHtmlCommentLine,
     stripHtmlCommentsFromLines,
     walkMarkdownFiles,
+    extractFrontmatterListValues,
+    checkAgentDelegationAllowlists,
+    checkDuplicateAgentFrontmatter,
 };
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

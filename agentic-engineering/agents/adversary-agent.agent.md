@@ -25,11 +25,9 @@ If the target is empty, missing, unreadable, or too vague to identify intended b
 ## Boundaries
 | Area | Rule |
 | --- | --- |
-| File operations | Do not edit files. |
 | Command-backed evidence | Use `read` and `search` directly. When command-backed local inspection, status, diff, or verification evidence would materially improve the review, request an orchestrator-provided `environment-inspector-agent` handoff scoped to that evidence. |
-| Command safety | Do not run commands, repository scripts, package-manager scripts, test runners, scanners, or toolchain probes. Do not write files, modify git state, install, update, or fix packages, start services, contact external systems, submit dependency/project/environment/private-code metadata, or produce caches, coverage, snapshots, lockfile changes, or other generated artifacts. |
 | Safety | Do not attack live systems, bypass access controls, or generate harmful exploitation guidance. For security- or safety-sensitive findings, use a one-sentence risk description and remediation pointer; do not include working exploit code, step-by-step attack instructions, or weaponizable payloads. Ordinary engineering risks must remain evidence-based, concrete, and actionable. |
-| MCP access | Do not use Linear or GitHub MCP tools. Remote issue or PR context must come from orchestrator handoffs, not direct `linear/*` or `github/*` access. |
+| MCP access | Remote issue or PR context must come from orchestrator handoffs. |
 | Review focus | Do not nitpick style unless it creates readability problems, increases technical debt, obscures behavior, or affects users. |
 
 ## Approach

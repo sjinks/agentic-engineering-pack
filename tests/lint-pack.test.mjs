@@ -12,6 +12,9 @@ import {
     stripHtmlCommentLine,
     stripHtmlCommentsFromLines,
     walkMarkdownFiles,
+    extractFrontmatterListValues,
+    checkAgentDelegationAllowlists,
+    checkDuplicateAgentFrontmatter,
 } from '../scripts/lint-pack.mjs';
 
 const longBody = 'This anchor has enough visible body content to satisfy the linter body measurement check.';
@@ -146,4 +149,172 @@ test('walkMarkdownFiles throws explicit error when an existing markdown root can
         await chmod(skillsRoot, 0o755).catch(() => {});
         await rm(tempRoot, { recursive: true, force: true });
     }
+});
+
+test('agent delegation allowlist check reports missing allowlist and invalid delegates', async () => {
+    const sampleAgent = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - read',
+        '  - agent',
+        '---',
+        '',
+        '# Sample agent',
+    ];
+
+    const sampleAgentNoAllow = { rel: '.github/agents/sample.agent.md', lines: sampleAgent, inCodeBlock: annotateCodeBlocks(sampleAgent) };
+
+    const known = { agents: new Set(['builder-agent', 'test-agent']) };
+
+    const findings = checkAgentDelegationAllowlists([sampleAgentNoAllow], known);
+    assert.ok(findings.some((f) => /LINT_AGENT_MISSING_ALLOWLIST/.test(f.reason)), 'missing allowlist is reported');
+
+    const sampleAgentBlockEmptyAllowlist = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - read',
+        '  - agent',
+        'agents:',
+        '---',
+        '',
+        '# Sample agent',
+    ];
+    const sampleAgentBlockEmpty = { rel: '.github/agents/sample-empty-block.agent.md', lines: sampleAgentBlockEmptyAllowlist, inCodeBlock: annotateCodeBlocks(sampleAgentBlockEmptyAllowlist) };
+
+    const blockEmptyFindings = checkAgentDelegationAllowlists([sampleAgentBlockEmpty], known);
+    assert.ok(blockEmptyFindings.some((f) => /LINT_AGENT_MISSING_ALLOWLIST/.test(f.reason)), 'block empty allowlist is reported');
+
+    const sampleAgentInlineEmptyAllowlist = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - read',
+        '  - agent',
+        'agents: []',
+        '---',
+        '',
+        '# Sample agent',
+    ];
+    const sampleAgentInlineEmpty = { rel: '.github/agents/sample-empty-inline.agent.md', lines: sampleAgentInlineEmptyAllowlist, inCodeBlock: annotateCodeBlocks(sampleAgentInlineEmptyAllowlist) };
+
+    const inlineEmptyFindings = checkAgentDelegationAllowlists([sampleAgentInlineEmpty], known);
+    assert.ok(inlineEmptyFindings.some((f) => /LINT_AGENT_MISSING_ALLOWLIST/.test(f.reason)), 'inline empty allowlist is reported');
+
+    const sampleAgentBadDelegate = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - read',
+        '  - agent',
+        'agents:',
+        '  - non-existent-agent',
+        '---',
+        '',
+        '# Sample agent',
+    ];
+    const sampleAgentBad = { rel: '.github/agents/sample2.agent.md', lines: sampleAgentBadDelegate, inCodeBlock: annotateCodeBlocks(sampleAgentBadDelegate) };
+
+    const findings2 = checkAgentDelegationAllowlists([sampleAgentBad], known);
+    assert.ok(findings2.some((f) => /LINT_AGENT_INVALID_DELEGATE/.test(f.reason)), 'invalid delegate is reported');
+});
+
+test('agent delegation allowlist check strips inline comments from block list tool values', () => {
+    const sampleAgent = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - read',
+        '  - agent # delegation',
+        '---',
+        '',
+        '# Sample agent',
+    ];
+    const file = { rel: '.github/agents/sample.agent.md', lines: sampleAgent, inCodeBlock: annotateCodeBlocks(sampleAgent) };
+
+    const findings = checkAgentDelegationAllowlists([file], { agents: new Set(['builder-agent']) });
+
+    assert.ok(findings.some((f) => /LINT_AGENT_MISSING_ALLOWLIST/.test(f.reason)));
+});
+
+test('agent delegation allowlist check strips inline comments from known delegates', () => {
+    const sampleAgent = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - agent',
+        'agents:',
+        '  - builder-agent # implements fixes',
+        '---',
+        '',
+        '# Sample agent',
+    ];
+    const file = { rel: '.github/agents/sample.agent.md', lines: sampleAgent, inCodeBlock: annotateCodeBlocks(sampleAgent) };
+
+    const findings = checkAgentDelegationAllowlists([file], { agents: new Set(['builder-agent']) });
+
+    assert.equal(findings.length, 0);
+});
+
+test('agent delegation allowlist check detects inline array tools with trailing comments', () => {
+    const sampleAgent = [
+        '---',
+        'name: "sample-agent"',
+        'tools: [read, agent] # delegation',
+        '---',
+        '',
+        '# Sample agent',
+    ];
+    const file = { rel: '.github/agents/sample.agent.md', lines: sampleAgent, inCodeBlock: annotateCodeBlocks(sampleAgent) };
+
+    const findings = checkAgentDelegationAllowlists([file], { agents: new Set(['builder-agent']) });
+
+    assert.ok(findings.some((f) => /LINT_AGENT_MISSING_ALLOWLIST/.test(f.reason)));
+});
+
+test('duplicate agent frontmatter check ignores body delimiters inside fenced code blocks', () => {
+    const lines = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - read',
+        '---',
+        '',
+        '# Sample agent',
+        '',
+        '```markdown',
+        '---',
+        'name: "not-frontmatter"',
+        '---',
+        '```',
+    ];
+    const file = { rel: '.github/agents/sample.agent.md', lines, inCodeBlock: annotateCodeBlocks(lines) };
+
+    const findings = checkDuplicateAgentFrontmatter([file]);
+
+    assert.equal(findings.length, 0);
+});
+
+test('duplicate agent frontmatter check reports a second frontmatter block after body', () => {
+    const lines = [
+        '---',
+        'name: "sample-agent"',
+        'tools:',
+        '  - read',
+        '---',
+        '',
+        '# Sample agent',
+        '',
+        '---',
+        'name: "duplicate-agent"',
+        'tools:',
+        '  - read',
+        '---',
+    ];
+    const file = { rel: '.github/agents/sample.agent.md', lines, inCodeBlock: annotateCodeBlocks(lines) };
+
+    const findings = checkDuplicateAgentFrontmatter([file]);
+
+    assert.ok(findings.some((f) => /LINT_AGENT_DUPLICATE_FRONTMATTER/.test(f.reason)));
 });

@@ -442,6 +442,25 @@ test('.github agent and skill pack surfaces resolve to source or remain byte-ide
     }
 });
 
+test('pr-review-agent frontmatter includes expected agents allowlist and retains agent tool', async () => {
+    const text = await read(prReviewAgentPath);
+    const agents = frontmatterListValues(text, 'agents');
+    const tools = frontmatterListValues(text, 'tools');
+
+    const expected = [
+        'builder-agent',
+        'test-agent',
+        'code-reviewer-agent',
+        'independent-code-reviewer-agent',
+        'security-reviewer-agent',
+        'adversary-agent',
+        'integrator-agent',
+    ];
+
+    assert.deepEqual(agents, expected, 'pr-review-agent `agents:` list matches expected allowlist in order');
+    assert.ok(tools.includes('agent'), 'pr-review-agent still grants the `agent` tool');
+});
+
 test('Linear skill orders commit hygiene, push visibility, gatekeeper, then PR creation', async () => {
     const text = await read(linearSkillPath);
     const commitHygiene = text.indexOf('7. **Clean commit history with commit hygiene.**');
@@ -1153,7 +1172,7 @@ test('pending-review inline comment tool is intentionally not granted in this pa
 
     assert.match(safety, /`mcp_github_add_pull_request_review_comment_to_pending_review` is not currently granted to any agent in this pack/);
     assert.match(prReviewSkill, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
-    assert.match(prReviewAgent, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
+    assert.match(prReviewAgent, /Pending-review inline comments are not currently granted to this agent or any other agent in this pack/);
     assert.match(replyResolve, /## Pending Review Lifecycle \(Not Currently Available\)/);
     assert.match(replyResolve, /Pending-review inline comments \(`mcp_github_add_pull_request_review_comment_to_pending_review`\) are not currently granted/);
     assert.match(replyResolve, /The lifecycle below documents the design but is not an active workflow path/);
@@ -2219,7 +2238,7 @@ test('PR review-write contract narrows resolve-only and prefers VS Code extensio
     assert.match(prReviewAgent, /`github\/pull_request_review_write` is the fallback surface for thread resolution\/unresolution/);
     assert.match(prReviewAgent, /Other methods on this grant \u2014 including `method=create` for new top-level reviews \u2014 are not used by this pack\./);
     assert.match(prReviewAgent, /Thread resolution \(preferred\): `github\.vscode-pull-request-github\/resolveReviewThread`/);
-    assert.match(prReviewAgent, /Thread resolution \(fallback when the VS Code PR extension surface is unavailable\): `mcp_github_pull_request_review_write`/);
+    assert.match(prReviewAgent, /Thread resolution \(fallback when the VS Code PR extension surface is unavailable\): `github\/pull_request_review_write`/);
     assert.doesNotMatch(prReviewAgent, /submit reviews/i);
 
     // pr-creation-agent: handoff-sourced state, no self-inspection of remote/git
@@ -2340,7 +2359,7 @@ test('pr-creation-agent forbids mutating-probe pushed-visible discovery', async 
     );
     assert.match(
         approachSection,
-        /Do not call `mcp_github_create_pull_request` to discover pushed-visible status from its error response/,
+        /Do not call `github\/create_pull_request` to discover pushed-visible status from its error response/,
         'pr-creation-agent step 2 must explicitly forbid the mutating-probe reading',
     );
     assert.match(
@@ -2350,7 +2369,7 @@ test('pr-creation-agent forbids mutating-probe pushed-visible discovery', async 
     );
     assert.doesNotMatch(
         approachSection,
-        /the `mcp_github_create_pull_request` tool's own error response is the fallback failure surface/,
+        /the `github\/create_pull_request` tool's own error response is the fallback failure surface/,
         'pr-creation-agent step 2 must no longer authorize the tool error as a fallback failure surface',
     );
 });
