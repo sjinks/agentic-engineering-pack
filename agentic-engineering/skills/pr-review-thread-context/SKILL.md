@@ -1,32 +1,32 @@
 ---
 name: pr-review-thread-context
-description: "Internal use when: acquiring GitHub PR review-thread context, real thread IDs, comment reply IDs, fresh unresolved/reopened snapshots, and per-subaction blockers from orchestrator-sourced github-context-agent reads."
+description: "Internal use when: acquiring GitHub PR review-thread context, real thread IDs, comment reply IDs, fresh unresolved/reopened snapshots, and per-subaction blockers from github-context-agent reads."
 argument-hint: "PR context from orchestrator handoff, repository, branch, and the specific reply/resolve/read sub-actions that need IDs."
 user-invocable: false
 ---
 
 # PR Review Thread Context
 
-Acquire PR review context and real identifiers for `pr-review-comments-workflow` from orchestrator-sourced github-context-agent reads. This skill is internal: the user-facing entry point remains `pr-review-comments-workflow`.
+Acquire PR review context and real identifiers for `pr-review-comments-workflow` from `github-context-agent` reads. This skill is internal: the user-facing entry point remains `pr-review-comments-workflow`.
 
 ## Scope
 
-- Receive orchestrator-sourced GitHub context from github-context-agent: active PR identity, repository, head/base branch, PR head SHA, review comments, thread state, and real IDs required for reply or resolution sub-actions.
-- Produce a fresh unresolved/reopened snapshot before `review-cycle-gatekeeper` and before reply/resolve actions by requesting fresh github-context-agent reads via the orchestrator.
+- Receive orchestrator-sourced GitHub context from `github-context-agent` reads: active PR identity, repository, head/base branch, PR head SHA, review comments, thread state, and real IDs required for reply or resolution sub-actions.
+- Produce a fresh unresolved/reopened snapshot before `review-cycle-gatekeeper` and before reply/resolve actions by requesting fresh `github-context-agent` reads via the orchestrator.
 - Block only the affected sub-action when an ID needed for that sub-action is missing from the orchestrator-sourced context.
 - Do not infer IDs from paths, line numbers, arbitrary URLs, user-provided fragments, stale cache, search snippets, placeholders, guesses, or prior partial reads. The only URL-derived exception is the narrow `html_url` `#discussion_r<digits>` fallback described under ID Mapping, and only for direct existing-comment replies.
 
 ## Approved Read Paths
 
-GitHub PR review-thread context is owned by `github-context-agent` and accessed via orchestrator handoffs. pr-review-agent does not hold `github/pull_request_read` or `github.vscode-pull-request-github/activePullRequest` grants.
+GitHub PR review-thread context is owned by `github-context-agent`, then distilled by the orchestrator into handoffs. Focused PR-review skills do not self-service GitHub context.
 
-1. **Orchestrator-sourced PR metadata from github-context-agent**: The orchestrator calls `github-context-agent`, which uses `github.vscode-pull-request-github/activePullRequest` and `github/pull_request_read` (with `method=get`, `method=get_review_comments`, `method=get_reviews`) to read PR identity (owner, repo, PR number, URL, head/base branches, PR head SHA), review comments, review history, and thread state. The orchestrator distills this data and passes it in the pr-review-agent handoff.
+1. **Orchestrator-sourced PR metadata from `github-context-agent` reads**: `github-context-agent` uses `github.vscode-pull-request-github/activePullRequest` and exact GitHub PR reads (with `method=get`, `method=get_review_comments`, `method=get_reviews`) to read PR identity (owner, repo, PR number, URL, head/base branches, PR head SHA), review comments, review history, and thread state. The orchestrator distills this data and passes it in the workflow handoff.
 
-2. **Orchestrator-provided thread node IDs and comment reply IDs**: The orchestrator's github-context-agent read includes review-thread node IDs (for `resolveReviewThread` operations) and review-comment reply IDs (for `github/add_reply_to_pull_request_comment` operations). These IDs are distilled and passed to pr-review-agent in the handoff.
+2. **Orchestrator-provided thread node IDs and comment reply IDs**: `github-context-agent` reads include review-thread node IDs (for `resolveReviewThread` operations) and review-comment reply IDs (for `github/add_reply_to_pull_request_comment` operations). These IDs are distilled and passed in the handoff.
 
-3. **Orchestrator-sourced fresh unresolved/reopened snapshots from github-context-agent**: When the `pr-review-comments-workflow` coordinator workflow requires a fresh thread state after push visibility (see that workflow's step "Refresh unresolved/reopened review-thread state after push visibility"), the orchestrator invokes github-context-agent again to re-read the thread state, then passes the fresh snapshot to pr-review-agent. This read path applies the `workflow-safety-gates` Remote Read-Only Tool Intent Gate.
+3. **Orchestrator-sourced fresh unresolved/reopened snapshots from `github-context-agent` reads**: When the `pr-review-comments-workflow` coordinator workflow requires a fresh thread state after push visibility (see that workflow's step "Refresh unresolved/reopened review-thread state after push visibility"), the orchestrator delegates the read to `github-context-agent`, then passes the fresh snapshot in the handoff. This read path applies the `workflow-safety-gates` Remote Read-Only Tool Intent Gate.
 
-When the orchestrator is not on the call path or github-context-agent reads are unavailable, pr-review-agent cannot self-service this context. In that case, report that GitHub context is unavailable and route the operator to the orchestrator-mediated entry path.
+When the orchestrator is not on the call path or `github-context-agent` reads are unavailable, focused PR-review skills cannot self-service this context. In that case, report that GitHub context is unavailable and route the operator to the orchestrator-mediated entry path.
 
 ## ID Mapping
 
@@ -40,7 +40,7 @@ When the orchestrator is not on the call path or github-context-agent reads are 
 Return:
 
 - PR identity: owner, repo, PR number, URL if available, head branch, base branch, PR head SHA, and source path for each field.
-- Read paths used: active PR extension read, github-context-agent-owned MCP `get`, `get_review_comments`, and `get_reviews` reads, or not used, with success/failure status and read/not-read boundaries.
+- Read paths used: active PR extension read, `github-context-agent` GitHub `get`, `get_review_comments`, and `get_reviews` reads, or not used, with success/failure status and read/not-read boundaries.
 - Freshness: timestamp or sequence point, whether the snapshot is pre-push or post-push, and whether it is fresh for gatekeeper/reply/resolve.
 - Thread snapshot: unresolved/reopened threads, resolved threads when relevant, outdated status when available, cited file/region, latest reviewer comment, thread node ID if available, comment database ID if available, direct existing-comment reply `commentId` if available, and whether review-thread and nested-comment pagination was exhausted or intentionally not needed.
 - Per-subaction readiness: `reply-ready`, `resolve-ready`, `gatekeeper-ready`, or `blocked` for each thread/sub-action.
@@ -51,6 +51,6 @@ Return:
 
 - If a required real critical identifier is unavailable, block only the affected reply or resolve sub-action and report the missing field.
 - If the fresh unresolved/reopened snapshot cannot be produced, gatekeeper input is unknown; pass a blocker to `pr-review-round-closure` rather than reusing stale data.
-- If github-context-agent-owned reads do not provide the needed `reviewThreads` or nested `comments` IDs, or pagination/read completeness cannot be proven, mark the affected reply/resolve sub-action or gatekeeper snapshot incomplete/blocked and do not present it as fresh or gatekeeper-ready. Do not recover missing IDs through generic GraphQL CLI/API or execute-capable paths.
+- If `github-context-agent` reads do not provide the needed `reviewThreads` or nested `comments` IDs, or pagination/read completeness cannot be proven, mark the affected reply/resolve sub-action or gatekeeper snapshot incomplete/blocked and do not present it as fresh or gatekeeper-ready. Do not recover missing IDs through generic GraphQL CLI/API or execute-capable paths.
 - If only an arbitrary URL, file path, line number, user-provided fragment, guessed value, placeholder, dummy ID, search snippet, stale cache, or prior partial read is available, treat the ID as missing. The only URL-derived exception is the exact fresh-read `html_url` `#discussion_r<digits>` fallback for direct existing-comment reply `commentId`, under the provenance and fail-closed rules above.
 - GitHub repository file mutation tools remain denied and are never a context fallback.
