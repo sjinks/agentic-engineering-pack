@@ -51,7 +51,7 @@ Reference selection rules:
 
 | Signal for a directly referenced path/URL | Action |
 | --- | --- |
-| Same sentence, bullet, or table row says the reference is required, authoritative, an acceptance criterion, an implementation contract, verification evidence, migration/rollback material, or conformance material | Read it. This is the only direct signal. Generic wording like `uses`, `related`, `see also`, or `mentioned in` is not a direct signal. |
+| Same sentence, bullet, or table row says the reference is required, authoritative, an acceptance criterion, an implementation contract, verification evidence, migration/rollback material, or conformance material | Read it. This is the only direct same-sentence/bullet/table-row signal. Generic wording like `uses`, `related`, `see also`, or `mentioned in` is not a direct signal. |
 | Same sentence, bullet, or table row introduces the reference only as an example, background, historical note, optional reading, related work, unrelated log, or non-authoritative commentary | Do not read it. |
 | The reference lacks its own direct or skip signal, but its containing heading marks that section as required, authoritative, Acceptance criteria, implementation contract, verification evidence, migration/rollback material, or conformance material | Read it until the next same-level or higher heading. A skip-list marker inside that section skips it unless its own sentence, bullet, or table row explicitly marks it required. |
 | No direct, skip-list, or heading signal | Do not read it. |
