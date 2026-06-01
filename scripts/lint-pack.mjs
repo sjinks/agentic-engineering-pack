@@ -24,8 +24,8 @@
  *     `architect-agent` when referenced verbatim across the pack.
  *
  * Read-only: never writes files, never invokes git, never spawns external
- * processes. Walks only `.github/skills/`, `.github/agents/`, `.github/prompts/`,
- * and `agentic-engineering/shared/`.
+ * processes. Walks only `agentic-engineering/skills/`, `agentic-engineering/agents/`,
+ * `agentic-engineering/prompts/`, and `agentic-engineering/shared/`.
  *
  * Usage:
  *   node scripts/lint-pack.mjs            # run all checks, exit 1 on any error
@@ -37,19 +37,19 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PACK_DIRS = ['.github/skills', '.github/agents', '.github/prompts', 'agentic-engineering/shared'];
-const SKILLS_DIR = '.github/skills';
-const AGENTS_DIR = '.github/agents';
+const PACK_DIRS = ['agentic-engineering/skills', 'agentic-engineering/agents', 'agentic-engineering/prompts', 'agentic-engineering/shared'];
+const SKILLS_DIR = 'agentic-engineering/skills';
+const AGENTS_DIR = 'agentic-engineering/agents';
 
-const GATEKEEPER_REL = '.github/skills/review-cycle-gatekeeper/SKILL.md';
+const GATEKEEPER_REL = 'agentic-engineering/skills/review-cycle-gatekeeper/SKILL.md';
 
 // Files where backticked title-case severity (`Critical`/`High`/`Medium`/`Low`)
 // is the intentional canonical format rather than drift. Check 2 skips the
 // backticked-severity sub-check entirely for these files; sentinel-drift and
 // adversarial-prefix rules still apply.
 const TITLE_CASE_SEVERITY_FILES = new Set([
-    '.github/skills/review-cycle-gatekeeper/SKILL.md',
-    '.github/skills/test-gap-to-test-plan/SKILL.md',
+    'agentic-engineering/skills/review-cycle-gatekeeper/SKILL.md',
+    'agentic-engineering/skills/test-gap-to-test-plan/SKILL.md',
 ]);
 
 const CANONICAL_SENTINEL = 'no fix cycle, gatekeeper skipped';
@@ -101,14 +101,14 @@ async function findRepoRoot(startPath) {
     let current = path.resolve(startPath);
     for (; ;) {
         try {
-            const info = await stat(path.join(current, '.github'));
+            const info = await stat(path.join(current, 'agentic-engineering'));
             if (info.isDirectory()) return current;
         } catch { /* walk upward */ }
         const parent = path.dirname(current);
         if (parent === current) break;
         current = parent;
     }
-    throw new Error('Could not locate repo root (no .github/ found).');
+    throw new Error('Could not locate repo root (no agentic-engineering/ found).');
 }
 
 async function walkInto(dir, rootAbs, results) {
@@ -410,7 +410,7 @@ function checkUnresolvedRefs(files, known) {
     return findings;
 }
 
-const ORCHESTRATOR_REL = '.github/agents/agentic-engineering-orchestrator.agent.md';
+const ORCHESTRATOR_REL = 'agentic-engineering/agents/agentic-engineering-orchestrator.agent.md';
 
 const ORCHESTRATOR_SPEC_GATE_ANCHORS = [
     { anchor: '7a. Spec-first gate.', reason: 'spec-first gate step 7a missing from orchestrator' },
@@ -524,16 +524,16 @@ function checkOrchestratorSpecGateAnchors(files) {
 }
 
 const CANONICAL_SECTIONS = [
-    { producer: '.github/agents/spec-agent.agent.md', section: 'Functional requirements' },
-    { producer: '.github/agents/spec-agent.agent.md', section: 'Acceptance criteria' },
-    { producer: '.github/agents/spec-agent.agent.md', section: 'Interfaces and data shapes' },
-    { producer: '.github/agents/spec-agent.agent.md', section: 'Edge cases and error scenarios' },
-    { producer: '.github/agents/spec-agent.agent.md', section: 'Inputs from upstream context' },
-    { producer: '.github/agents/architect-agent.agent.md', section: 'Recommended design' },
-    { producer: '.github/agents/architect-agent.agent.md', section: 'Files or modules affected' },
-    { producer: '.github/agents/architect-agent.agent.md', section: 'Interfaces and data shapes' },
-    { producer: '.github/agents/architect-agent.agent.md', section: 'State transitions and failure modes' },
-    { producer: '.github/agents/architect-agent.agent.md', section: 'Verification plan' },
+    { producer: 'agentic-engineering/agents/spec-agent.agent.md', section: 'Functional requirements' },
+    { producer: 'agentic-engineering/agents/spec-agent.agent.md', section: 'Acceptance criteria' },
+    { producer: 'agentic-engineering/agents/spec-agent.agent.md', section: 'Interfaces and data shapes' },
+    { producer: 'agentic-engineering/agents/spec-agent.agent.md', section: 'Edge cases and error scenarios' },
+    { producer: 'agentic-engineering/agents/spec-agent.agent.md', section: 'Inputs from upstream context' },
+    { producer: 'agentic-engineering/agents/architect-agent.agent.md', section: 'Recommended design' },
+    { producer: 'agentic-engineering/agents/architect-agent.agent.md', section: 'Files or modules affected' },
+    { producer: 'agentic-engineering/agents/architect-agent.agent.md', section: 'Interfaces and data shapes' },
+    { producer: 'agentic-engineering/agents/architect-agent.agent.md', section: 'State transitions and failure modes' },
+    { producer: 'agentic-engineering/agents/architect-agent.agent.md', section: 'Verification plan' },
 ];
 
 function escapeRegExp(value) {
