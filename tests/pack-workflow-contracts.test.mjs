@@ -35,6 +35,7 @@ const gitOperatorAgentPath = 'agentic-engineering/agents/git-operator-agent.agen
 const githubContextAgentPath = 'agentic-engineering/agents/github-context-agent.agent.md';
 const prCreationAgentPath = 'agentic-engineering/agents/pr-creation-agent.agent.md';
 const prReviewAgentPath = 'agentic-engineering/agents/pr-review-agent.agent.md';
+const researchAgentPath = 'agentic-engineering/agents/research-agent.agent.md';
 const prReviewFocusedSkillPaths = [
     prReviewThreadContextPath,
     prReviewCommentValidationPath,
@@ -1537,6 +1538,32 @@ test('builder classifies builder-run PR-review checks or defers broad validation
     assert.match(text, /When verification is in scope for a PR-review fix, classify builder-run checks as targeted verification or broad safe validation/);
     assert.match(text, /If broad safe validation belongs to `test-agent` or cannot be selected under the current command boundaries, report the candidate command\(s\) inspected and selected command or unavailable-command conclusion explicitly instead of treating targeted checks as broad validation/);
     assert.match(text, /Targeted vs broad safe validation when PR-review fixes are in scope:[\s\S]+candidate command\(s\) inspected; selected command or unavailable-command conclusion/);
+});
+
+test('research agent preserves sanitized public-query status semantics', async () => {
+    const text = await read(researchAgentPath);
+    const decisionRules = sliceBetween(text, '## Decision Rules', '## Approach', 'research agent decision rules section');
+    const approach = sliceBetween(text, '## Approach', '## Output Format', 'research agent approach section');
+    const outputFormat = sliceFrom(text, '## Output Format', 'research agent output format section');
+
+    assert.deepEqual(frontmatterListValues(text, 'tools'), ['web']);
+    assert.match(text, /GitHub\/Linear workflow context such as issues, PRs, review threads, notifications, private repositories, or remote project state must come from the orchestrator handoff and must not be fetched directly/);
+    assert.match(text, /Linear\/GitHub payload text, customer data, source comments, stack traces, private package names or scopes/);
+    assert.match(decisionRules, /Keep local applicability `unknown` until the orchestrator supplies local version\/config evidence/);
+    assert.match(outputFormat, /^- Research status: completed \| blocked \| partial\.$/m);
+    assert.match(decisionRules, /`partial` when public research is limited/);
+    assert.match(decisionRules, /source access/);
+    assert.match(decisionRules, /missing relevant public sources/);
+    assert.match(decisionRules, /only low-authority sources/);
+    assert.match(decisionRules, /`blocked` only when useful research cannot proceed/);
+    assert.match(decisionRules, /private details/);
+    assert.match(decisionRules, /sanitized public query/);
+    assert.match(decisionRules, /local-only validation/);
+    assert.match(decisionRules, /unavailable web tool/);
+    assert.match(decisionRules, /required before research can run/);
+    assert.match(approach, /If the web tool is unavailable before research can run, report `Research status: blocked`/);
+    assert.match(approach, /recommend the exact next sanitized public query or local validation needed/);
+    assert.match(outputFormat, /^- Recommended next public query \(sanitized\): for `partial` or `blocked` results that need another public query; otherwise `not applicable`\.$/m);
 });
 
 test('Linear entrypoints and docs carry no-PR thread-state proof language', async () => {
