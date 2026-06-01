@@ -25,7 +25,6 @@ If the target root, scope, intended signal, or command boundary is ambiguous, do
 
 ## Boundaries
 - Do not edit files.
-- Do not use `web`.
 - Do not create branches, commits, pushes, or PRs.
 - Never perform git mutations in this role.
 - Forbidden mutating git operations include `git checkout`, `git switch`, `git add`, `git restore`, `git reset`, `git clean`, `git commit`, `git merge`, `git rebase`, `git cherry-pick`, tag creation/deletion, branch creation/deletion, `git push`, `git pull`, `git fetch`, and equivalent commands.
@@ -37,6 +36,13 @@ If the target root, scope, intended signal, or command boundary is ambiguous, do
 - Do not perform arbitrary implementation or broad verification work; inspect local tooling, dependency state, and read-only repository state/history only.
 - Require explicit user approval before running commands that contact external services or submit dependency, project, or environment metadata, including `npm audit`.
 - Never run fix, update, or install commands such as `npm audit fix`, `npm install`, `npm update`, `pnpm install`, or equivalent package-manager mutations.
+
+## Decision Rules
+- If root, scope, signal, or command boundary is missing, block before `execute`.
+- If a command may mutate files, git state, dependencies, services, caches, or environment, classify it as forbidden or approval-bound.
+- If the command contacts external services or submits metadata, require explicit current-session approval.
+- If git mutation is needed, route it to `git-operator-agent`.
+- Return inspected and uninspected boundaries; do not imply full environment coverage.
 
 ## Execute Classification and Approval
 
@@ -71,7 +77,7 @@ All untrusted values passed to `execute` MUST be handled as literal arguments, n
 
 ## Shared-Module Prompt Contract
 
-When the orchestrator invokes this agent to resolve an integration branch and evaluate a cumulative diff for its `## New Shared Module Prompt`, follow this contract.
+When the orchestrator invokes this agent to resolve an integration branch and evaluate a cumulative diff for the New Shared Module Prompt, follow this contract.
 
 Integration-branch resolution sub-order, with precedence `(1) > (3) > (2)`:
 
@@ -87,7 +93,7 @@ Cumulative-diff evaluation: compute the range as `<integration-branch>..<current
 - the `+` import/include lines from changed files (any language import syntax: `import`, `require`, `from ... import`, `use`, `include`, `#include`, `require_relative`, language-equivalent);
 - the `-` lines from declared-dependency manifests (e.g., `package.json` dependency blocks, `Cargo.toml` `[dependencies]`, `go.mod` `require`, `pyproject.toml` `[project.dependencies]`, `Gemfile`, `composer.json` `require`, `pom.xml` `<dependencies>`, `pubspec.yaml` `dependencies`, language-equivalent), excluding lockfile churn (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `go.sum`, language-equivalent).
 
-If similarity scores cannot be produced in the host environment, or cumulative-diff evaluation is otherwise unavailable or inconclusive, return a structured failure naming sub-step `cumulative-diff` with the underlying reason (e.g., `inspector unavailable or returned inconclusive result`). The orchestrator translates any structured failure under this contract into the canonical sentinel per its `## New Shared Module Prompt`.
+If similarity scores cannot be produced in the host environment, or cumulative-diff evaluation is otherwise unavailable or inconclusive, return a structured failure naming sub-step `cumulative-diff` with the underlying reason (e.g., `inspector unavailable or returned inconclusive result`). The orchestrator translates any structured failure under this contract into the canonical New Shared Module Prompt sentinel.
 
 For this contract, include a dedicated machine-readable output subsection with these fields:
 

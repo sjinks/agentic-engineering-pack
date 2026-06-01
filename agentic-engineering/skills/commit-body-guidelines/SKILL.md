@@ -25,10 +25,29 @@ No functional changes.
 
 - **Apply workflow-safety-gates before executable commit guidance.** Before creating, amending, applying, or recommending executable commit commands, apply `workflow-safety-gates` and confirm the real target workspace/repo, current branch, default/base branch, upstream/remote, dirty/staged/unstaged scope, pushed/shared status, and exact target range/branch/SHA/path where relevant.
 - **Draft only when scope is uncertain.** If the target repository, branch, upstream, dirty/staged/unstaged scope, pushed/shared status, target range, target path, or commit-ish values are ambiguous, draft or revise the message only and report the blocker.
-- **Use local git execution only through an authorized specialist.** Commit creation, amend, or history rewrite must be done through local git execution by the appropriate edit/execute-capable specialist under workflow/user authorization. The orchestrator must not create commits directly.
-- **Stop when local execution is unavailable.** If authorized local execution/delegation is unavailable, stop and report blocked, or draft the message only.
-- **No GitHub file mutation substitutes.** Do not use `mcp_github_create_or_update_file`, `mcp_github_push_files`, or `mcp_github_delete_file` as commit, amend, branch-preparation, push, or recovery substitutes.
+- **Use local git execution only after delegated mutation gates pass.** Commit creation, amend, or history rewrite requires passed `workflow-safety-gates` preflight plus a satisfied Local Git Mutation Delegation Contract that names an edit/execute-capable specialist or an explicitly approved local execution path. The orchestrator must not create commits directly.
+- **Stop when requested local execution is unavailable.** If requested executable guidance cannot pass preflight, approval, local execution/delegation, scope validation, or executable command guidance checks, return `Status: blocked`. Return `Status: draft-only` only when executable guidance is not requested and a body can still be drafted, reviewed, or revised.
 - **Pass message text via `-F <message-file>` only.** Commit messages must reach git via `-F <message-file>` from a file written by an authorized file-write tool. Never use `git commit -m "..."`, `-m '...'`, `echo ... > file`, `printf ... > file`, `cat <<EOF`, or any other shell-interpolated path for the message. See `workflow-safety-gates` "Shell-Safe Local Execution" for the canonical rule.
+
+## Status Contract
+
+Return exactly one operator-facing status:
+
+- `Status: ready` only when executable command guidance was requested, the message body is ready, and the message body plus executable guidance are allowed by passed preflight, approval, local execution/delegation, scope validation, and `-F <message-file>` guidance checks.
+- `Status: draft-only` when a body can be drafted, revised, or reviewed and executable guidance is not requested.
+- `Status: blocked` when preflight, approval, local execution/delegation, scope validation, or executable command guidance is blocked.
+
+When executable guidance is requested and blocked, `Status: blocked` takes precedence over `Status: draft-only` even if a draft or revised body can still be included.
+
+For drafting from a diff, rationale-to-diff validation, or requested executable guidance, empty or no relevant diff, staged-commit requests with no staged changes, or unrelated changes outside the requested scope block the request. Return `Status: blocked`, do not invent rationale, list the exact missing diff, missing staged changes, or unrelated files/ranges, and ask for the intended files, diff, or range. These scope blockers do not block content-only validation of an existing or proposed commit body. For content-only validation without a relevant diff, return `Validation: pass` or `Validation: fail` with a caveat that diff alignment and rationale-to-diff fit were not checked.
+
+## Validation and Review Mode
+
+When asked to validate, review, or revise an existing or proposed commit body, do not rewrite it by default. Validate it against the Core Rule, Audience and Content rules, forbidden content rules, structure guidance, and Testing and Validation honesty.
+
+Return `Validation: pass`, `Validation: fail`, or `Validation: not requested`. For failed validation, list the failed checks and concise evidence. Provide a revised body only when the user asks for a revision or when the requested task is explicitly to rewrite the body.
+
+When no relevant diff is available, content-only validation of an existing or proposed body is still allowed. Include a caveat that diff alignment and rationale-to-diff fit were not checked; block only requested rationale-to-diff validation, drafting-from-diff, or executable guidance that needs the missing scope.
 
 ## Body Structure
 
@@ -102,11 +121,7 @@ The forbidden categories, positive rules, authorship-disclosure carve-out, and a
 - Full file contents or full diffs pasted into the body (the diff is already in the commit; do not duplicate it in prose).
 - Code snippets copied from license-incompatible sources — copyleft (GPL/AGPL) project code embedded in a permissively-licensed repository's commit body, commercial-vendor sample code with restrictive terms, or code copied from sources with unknown license. Commit bodies are durable license-bearing artifacts and embedded code carries the source's license terms. Describe the algorithm or approach in your own words; do not paste licensed code into the commit body.
 
-If any of these categories must be referenced to explain the change, replace the literal content with a sanitized summary or a stable link to a non-public artifact. Suspected leak of any item in this list into a pushed commit body is NOT self-cleaning and requires this remediation sequence in order:
-
-1. **For credentials, tokens, signing keys, or any other authenticator** — rotate or revoke the leaked credential FIRST, verify the old credential is rejected by the system that issued it, and update any service or operator that still references the old credential. Do this before any history rewrite. Once pushed, the credential is compromised independent of the rewrite — every clone, fork, mirror, CI cache, and account that fetched between the push and the rewrite retains it. History rewrite without prior rotation is theater and produces a false "remediated" signal.
-2. **Then schedule a history rewrite under `commit-hygiene`** with explicit verbatim user approval per the `workflow-safety-gates` Local Git Mutation Delegation Contract. When the rewrite proceeds, the `commit-hygiene` Pre-Rewrite Checks create a backup branch (`<current>-pre-cleanup-<timestamp>`); for leak-remediation rewrites, that backup branch itself contains the leak in its full pre-rewrite form. The backup branch MUST be created on an isolated filesystem path or recorded as a git bundle outside the working tree, MUST NEVER be pushed to any remote (including via `git push --all` or `git push --mirror`), and MUST be deleted (and any bundle file securely removed) after rotation, the remote rewrite, and any fork or mirror coordination complete. If the leak landed on the default branch, the `commit-hygiene` "current branch is NOT the default branch" refusal applies — use `git filter-repo`, BFG, or the GitHub support ticket process for orphan-SHA removal; this skill stops at the boundary of those tools.
-3. **Finally, verify the rotated credential is not embedded in the rewritten history** and coordinate fork/mirror invalidation as appropriate.
+If any of these categories must be referenced to explain the change, replace the literal content with a sanitized summary or a stable link to a non-public artifact. Suspected leak of any item in this list into a pushed commit body is a hard stop: return `Status: blocked` and route remediation through `workflow-safety-gates` and `commit-hygiene`. Credentials, tokens, signing keys, and other authenticators must be rotated or revoked before any history rewrite. Rewriting a pushed leak requires explicit approval under the Local Git Mutation Delegation Contract. Backup branches, bundles, patches, or other artifacts that contain the leak must not be pushed and must be deleted after the remediation path completes. Leaks on the default branch route out to specialized history-scrubbing support such as `git filter-repo`, BFG, or GitHub support; this skill stops at that boundary.
 
 A commit body explains the change to a future maintainer who has no knowledge of how the change was produced. Write it as that maintainer would want to read it. If the only content available would be workflow trace, the commit is probably not ready — return to the diff and write a body about the change itself, or note honestly that the change is trivial (see Core Rule).
 
@@ -117,11 +132,13 @@ A commit body explains the change to a future maintainer who has no knowledge of
    - Run `git diff --staged` for staged commits, or `git diff HEAD` when drafting from current work.
    - If revising an existing commit, inspect it with `git show --stat --patch <commit-ish>`.
    - When revising existing commits or referring to commit-ish values, use real commit SHAs/ranges from read-only inspection. Do not use placeholder or example commit-ish values in actual git commands.
+   - If drafting from a diff, validating rationale-to-diff fit, or giving executable guidance is requested and there is no relevant diff, no staged changes for a staged-commit request, or unrelated changes outside the requested scope, stop with `Status: blocked`; list the exact missing or unrelated scope and ask for the intended files, diff, or range. Continue only for content-only validation of an existing or proposed body, with the diff-alignment caveat from Validation and Review Mode.
    - These inspection commands are read-only. Mutating commit, amend, or rewrite commands require the safety rules above.
 
 2. **Identify the reason for the change.**
    - State the problem, motivation, user need, bug, risk, or maintenance reason.
    - Include issue IDs or links when they materially explain the context.
+   - If the reason cannot be determined from the diff, request, issue context, or supplied body, do not invent one; return `Status: blocked` for drafting-from-diff or rationale-to-diff validation and ask for the missing rationale. For content-only validation, state that rationale-to-diff fit was not checked.
 
 3. **Summarize key changes when useful.**
    - Name the important code-level changes without copying the entire diff.
@@ -152,7 +169,9 @@ A commit body explains the change to a future maintainer who has no knowledge of
 
 Git treats lines starting with the configured comment character, usually `#`, as commit message comments when using the editor. That can remove Markdown headings such as `## Purpose and Context` during cleanup.
 
-When creating a commit message that contains Markdown headings after workflow safety preflight passes and authorized local git execution/delegation is available, use one of these approaches:
+When creating a commit message that contains Markdown headings after `workflow-safety-gates` preflight passes and the Local Git Mutation Delegation Contract names an edit/execute-capable specialist or an explicitly approved local execution path, use one of these approaches:
+
+In the command forms below, `<message-file>` is a placeholder; replace it with a real approved path before execution.
 
 1. Write the prepared commit message (with Markdown headings) to a message file using an authorized file-write tool.
 2. Invoke `git commit -F <message-file> --cleanup=whitespace` (or `git commit --amend -F <message-file> --cleanup=whitespace` for amend). The `--cleanup=whitespace` option preserves lines beginning with `#` while trimming trailing whitespace.
@@ -160,9 +179,9 @@ When creating a commit message that contains Markdown headings after workflow sa
 
 `--cleanup=verbatim` is acceptable when the message must be preserved exactly. Avoid `--cleanup=strip` for Markdown-headed bodies because it removes comment-character lines. Never use `git commit -m`, `--message`, or any shell-interpolated form; the message reaches git only via `-F`.
 
-**Placeholder caution:** When this skill writes `<message-file>` in examples, it is a documentation placeholder for the literal path to your commit message file. Do not pass the literal string `<message-file>` to any command. Substitute the actual path (for example, `.git/COMMIT_EDITMSG` or a file you wrote with `git commit -F path/to/message.txt`).
+**Placeholder caution:** When this skill writes `<message-file>` in examples, it is a documentation placeholder for the literal path to your commit message file. Do not pass the literal string `<message-file>` to any command. Substitute an approved workspace path such as `commit-message.txt` or another real path supplied by the delegation contract.
 
-If preflight, approval, or local execution/delegation is unavailable, do not provide executable commit commands; return the commit message and blocked status instead.
+If executable commit or amend guidance was requested and preflight, approval, or local execution/delegation is unavailable, do not provide executable commit commands; return `Status: blocked`; include the commit message only when drafting or revising remains valid.
 
 Do not globally change `core.commentChar` unless the user explicitly wants that repository or global preference changed.
 
@@ -199,7 +218,10 @@ Ran the authentication test suite locally.
 
 Return:
 
-- **Commit message:** The complete message in a fenced `text` code block.
+- **Status:** `ready`, `draft-only`, or `blocked`.
+- **Validation:** `pass`, `fail`, or `not requested`; when validation fails, list the failed checks.
+- **Blockers:** Exact preflight, approval, local execution/delegation, scope validation, executable command guidance, missing diff, missing staged changes, unrelated changes, or real message-file path blockers; write `none` only when there are no blockers.
+- **Commit message:** When drafting or revising, return the complete message in a fenced `text` code block.
 - **Body rationale:** A brief note explaining the main reasoning captured in the body.
 - **Validation note:** Any tests or checks reflected in the message, including when none were run.
-- **Commit command guidance:** When the message uses Markdown headings and the user wants to commit, include the two-step `-F` command guidance (write the message to a file with an authorized file-write tool, then `git commit -F <message-file> --cleanup=whitespace`) only after `workflow-safety-gates` Shell-Safe Local Execution and Local Git Mutation Delegation Contract preflight passes, authorized local execution/delegation is available, and a real message file path is known. Never include or recommend a `git commit -m "..."` form. If preflight fails or local execution is unavailable, report blocked and provide the message only.
+- **Commit command guidance:** Include executable command guidance only when requested, all gates pass, local execution/delegation is available, and a real message-file path is known. When the message uses Markdown headings and the user wants to commit, include the three-step `-F` command guidance only after `workflow-safety-gates` Shell-Safe Local Execution and Local Git Mutation Delegation Contract preflight passes: write the message to a file with an authorized file-write tool, run `git commit -F <real-message-file-path> --cleanup=whitespace`, then verify the stored message bytes using the byte-preserving raw extraction procedure from `workflow-safety-gates` Post-Commit Verification. Never include or recommend a `git commit -m "..."` form. If preflight fails, local execution is unavailable, or no real message-file path is available, return `Status: blocked` for requested executable guidance and provide the message only when drafting or revising is still valid.

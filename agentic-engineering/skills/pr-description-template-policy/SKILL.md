@@ -38,6 +38,11 @@ When generating a PR body for creation or final publication, check the target re
 - `.github/PULL_REQUEST_TEMPLATE/*.md`
 - root or `docs/` `PULL_REQUEST_TEMPLATE/*.md` directories when multiple templates are supported
 
+When this pack repository itself is the target, use the `agentic-engineering` source-root equivalents for pack-owned templates when present:
+
+- `agentic-engineering/pull_request_template.md`
+- `agentic-engineering/PULL_REQUEST_TEMPLATE/*.md`
+
 Do not assume GitHub MCP/API PR creation tools will auto-apply repository templates. The final PR body must be composed explicitly from the selected template or fallback structure.
 
 ## Selection and Fallback Rules

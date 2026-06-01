@@ -26,6 +26,7 @@ const pullRequestDescriptionPath = 'agentic-engineering/skills/pull-request-desc
 const prDescriptionTemplatePolicyPath = 'agentic-engineering/skills/pr-description-template-policy/SKILL.md';
 const prDescriptionBodyAuditPath = 'agentic-engineering/skills/pr-description-body-audit/SKILL.md';
 const adversarialReviewPath = 'agentic-engineering/skills/adversarial-review/SKILL.md';
+const commitBodyGuidelinesPath = 'agentic-engineering/skills/commit-body-guidelines/SKILL.md';
 const adversaryAgentPath = 'agentic-engineering/agents/adversary-agent.agent.md';
 const independentReviewerPath = 'agentic-engineering/agents/independent-code-reviewer-agent.agent.md';
 const reviewCycleGatekeeperPath = 'agentic-engineering/skills/review-cycle-gatekeeper/SKILL.md';
@@ -35,6 +36,8 @@ const gitOperatorAgentPath = 'agentic-engineering/agents/git-operator-agent.agen
 const githubContextAgentPath = 'agentic-engineering/agents/github-context-agent.agent.md';
 const prCreationAgentPath = 'agentic-engineering/agents/pr-creation-agent.agent.md';
 const prReviewAgentPath = 'agentic-engineering/agents/pr-review-agent.agent.md';
+const researchAgentPath = 'agentic-engineering/agents/research-agent.agent.md';
+const researchAgentMirrorPath = '.github/agents/research-agent.agent.md';
 const prReviewFocusedSkillPaths = [
     prReviewThreadContextPath,
     prReviewCommentValidationPath,
@@ -1539,6 +1542,45 @@ test('builder classifies builder-run PR-review checks or defers broad validation
     assert.match(text, /Targeted vs broad safe validation when PR-review fixes are in scope:[\s\S]+candidate command\(s\) inspected; selected command or unavailable-command conclusion/);
 });
 
+test('research agent preserves sanitized public-query status semantics', async () => {
+    const paths = [researchAgentPath, researchAgentMirrorPath];
+
+    for (const path of paths) {
+        assert.ok(await exists(path), `${path} exists`);
+    }
+
+    for (const path of paths) {
+        const text = await read(path);
+        const decisionRules = sliceBetween(text, '## Decision Rules', '## Approach', `${path} decision rules section`);
+        const approach = sliceBetween(text, '## Approach', '## Output Format', `${path} approach section`);
+        const outputFormat = sliceFrom(text, '## Output Format', `${path} output format section`);
+
+        assert.deepEqual(frontmatterListValues(text, 'tools'), ['web']);
+        assert.match(text, /GitHub\/Linear workflow context such as issues, PRs, review threads, notifications, private repositories, or remote project state must come from the orchestrator handoff and must not be fetched directly/);
+        assert.match(text, /Linear\/GitHub payload text, customer data, source comments, stack traces, private package names or scopes/);
+        assert.match(decisionRules, /Keep local applicability `unknown` until the orchestrator supplies local version\/config evidence/);
+        assert.match(outputFormat, /^- Research status: completed \| blocked \| partial\.$/m);
+        assert.match(decisionRules, /Use `Research status: blocked` when useful research cannot proceed because private details are needed to form a public-safe query, a sanitized public query is required, local-only validation is required before research can run, or the web tool is unavailable/);
+        assert.match(decisionRules, /populate `Recommended next public query \(sanitized\)` or `Recommended next local validation` with the next public-safe step/);
+        assert.match(decisionRules, /do not request or collect private details/);
+        assert.doesNotMatch(decisionRules, /ask for a sanitized public query or local validation/);
+        assert.match(decisionRules, /`partial` when public research is limited/);
+        assert.match(decisionRules, /source access/);
+        assert.match(decisionRules, /missing relevant public sources/);
+        assert.match(decisionRules, /only low-authority sources/);
+        assert.match(decisionRules, /useful research cannot proceed/);
+        assert.match(decisionRules, /private details/);
+        assert.match(decisionRules, /sanitized public query/);
+        assert.match(decisionRules, /local-only validation/);
+        assert.match(decisionRules, /web tool is unavailable/);
+        assert.match(approach, /If the web tool is unavailable before research can run, report `Research status: blocked`/);
+        assert.match(approach, /put the exact next public-safe query in `Recommended next public query \(sanitized\)` or the exact local-only check in `Recommended next local validation`/);
+        assert.match(approach, /use `not applicable` for the public-query field when no further public query is needed/);
+        assert.match(outputFormat, /^- Recommended next public query \(sanitized\): exact public-safe query for `partial` or `blocked` results when another public query is the next useful step; otherwise `not applicable`\.$/m);
+        assert.match(outputFormat, /^- Recommended next local validation: exact local-only validation needed, or `not applicable`\.$/m);
+    }
+});
+
 test('Linear entrypoints and docs carry no-PR thread-state proof language', async () => {
     const paths = await existingPaths([linearSkillPath, docsPath]);
     assert.ok(paths.length > 0, 'at least one linear entrypoint/doc path exists');
@@ -2046,6 +2088,97 @@ test('PR description body audit guards against hard-wrapped PR bodies and leakag
     assert.match(prDescription, /Template status, validation source, omissions\/warnings, and update status remain in operator-facing notes outside the fenced PR body/);
     assert.match(prDescription, /Each item MUST cite all of the following/);
     assert.match(prDescription, /drop the entire item from the section, list the dropped item in operator-facing notes with the offending citation excerpt/);
+});
+
+test('commit body guidelines expose status, validation, blocker, and leak-remediation contracts', async () => {
+    const text = await read(commitBodyGuidelinesPath);
+    const safetyRules = sliceBetween(text, '## Safety Rules', '## Status Contract', 'commit body safety rules section');
+    const statusContract = sliceBetween(text, '## Status Contract', '## Validation and Review Mode', 'commit body status contract section');
+    const validationMode = sliceBetween(text, '## Validation and Review Mode', '## Body Structure', 'commit body validation mode section');
+    const audience = sliceBetween(text, '## Audience and Content', '## Writing Procedure', 'commit body audience section');
+    const writingProcedure = sliceBetween(text, '## Writing Procedure', '## Formatting Rules', 'commit body writing procedure section');
+    const gitCleanupRule = sliceBetween(text, '## Git Cleanup Rule for Markdown Headings', '## Example Commit Message', 'commit body git cleanup rule section');
+    const outputFormat = sliceFrom(text, '## Output Format', 'commit body output format section');
+
+    for (const status of ['ready', 'draft-only', 'blocked']) {
+        assert.match(statusContract, new RegExp('`Status: ' + status + '`'), `${status} status is defined`);
+        assert.match(outputFormat, new RegExp('`' + status + '`'), `${status} status is listed in output`);
+    }
+
+    assert.match(statusContract, /preflight, approval, local execution\/delegation, scope validation, or executable command guidance is blocked/);
+    assert.match(statusContract, /`Status: ready` only when executable command guidance was requested, the message body is ready, and the message body plus executable guidance are allowed by passed preflight, approval, local execution\/delegation, scope validation, and `-F <message-file>` guidance checks/);
+    assert.match(statusContract, /empty or no relevant diff/);
+    assert.match(statusContract, /staged-commit requests with no staged changes/);
+    assert.match(statusContract, /unrelated changes outside the requested scope/);
+    assert.match(statusContract, /drafting from a diff, rationale-to-diff validation, or requested executable guidance/);
+    assert.match(statusContract, /`Status: draft-only` when a body can be drafted, revised, or reviewed and executable guidance is not requested/);
+    assert.match(statusContract, /When executable guidance is requested and blocked, `Status: blocked` takes precedence over `Status: draft-only` even if a draft or revised body can still be included/);
+    assert.match(statusContract, /do not block content-only validation of an existing or proposed commit body/);
+    assert.match(statusContract, /diff alignment and rationale-to-diff fit were not checked/);
+    assert.match(statusContract, /do not invent rationale/);
+    assert.match(statusContract, /ask for the intended files, diff, or range/);
+    assert.match(writingProcedure, /drafting from a diff, validating rationale-to-diff fit, or giving executable guidance/);
+    assert.match(writingProcedure, /Continue only for content-only validation of an existing or proposed body/);
+    assert.match(writingProcedure, /If the reason cannot be determined from the diff, request, issue context, or supplied body, do not invent one/);
+    assert.match(writingProcedure, /do not invent one/);
+    assert.match(writingProcedure, /return `Status: blocked` for drafting-from-diff or rationale-to-diff validation and ask for the missing rationale/);
+    assert.match(writingProcedure, /missing rationale/);
+    assert.match(writingProcedure, /For content-only validation, state that rationale-to-diff fit was not checked/);
+
+    for (const validationStatus of ['pass', 'fail', 'not requested']) {
+        assert.match(validationMode, new RegExp('`Validation: ' + validationStatus + '`'), `${validationStatus} validation status is defined`);
+        assert.match(outputFormat, new RegExp('`' + validationStatus + '`'), `${validationStatus} validation status is listed in output`);
+    }
+    assert.match(validationMode, /do not rewrite it by default/);
+    assert.match(validationMode, /Core Rule, Audience and Content rules, forbidden content rules, structure guidance, and Testing and Validation honesty/);
+    assert.match(validationMode, /For failed validation, list the failed checks/);
+    assert.match(validationMode, /Provide a revised body only when the user asks for a revision/);
+    assert.match(validationMode, /content-only validation of an existing or proposed body is still allowed/);
+    assert.match(validationMode, /diff alignment and rationale-to-diff fit were not checked/);
+    assert.match(validationMode, /block only requested rationale-to-diff validation, drafting-from-diff, or executable guidance/);
+    assert.match(outputFormat, /when validation fails, list the failed checks/);
+
+    assert.match(safetyRules, /requires passed `workflow-safety-gates` preflight plus a satisfied Local Git Mutation Delegation Contract/);
+    assert.match(safetyRules, /names an edit\/execute-capable specialist or an explicitly approved local execution path/);
+    assert.match(safetyRules, /Return `Status: draft-only` only when executable guidance is not requested and a body can still be drafted, reviewed, or revised/);
+    assert.match(outputFormat, /real message-file path is known/);
+    assert.match(outputFormat, /`git commit -F <real-message-file-path> --cleanup=whitespace`/);
+    assert.match(outputFormat, /three-step `-F` command guidance/);
+    assert.match(outputFormat, /Post-Commit Verification|raw extraction/);
+    assert.match(outputFormat, /write the message to a file with an authorized file-write tool/);
+    assert.match(outputFormat, /verify the stored message bytes/);
+    assert.match(outputFormat, /Never include or recommend a `git commit -m "\.\.\."` form/);
+    assert.doesNotMatch(outputFormat, /two-step `-F` command guidance/);
+
+    assert.match(safetyRules, /Never use `git commit -m "\.\.\."`/);
+    assert.match(safetyRules, /`echo \.\.\. > file`/);
+    assert.match(safetyRules, /`printf \.\.\. > file`/);
+    assert.match(safetyRules, /`cat <<EOF`/);
+    assert.match(safetyRules, /shell-interpolated path/);
+
+    assert.doesNotMatch(gitCleanupRule, /authorized local git execution\/delegation is available/);
+    assert.doesNotMatch(gitCleanupRule, /blocked status instead/);
+    assert.match(gitCleanupRule, /after `workflow-safety-gates` preflight passes and the Local Git Mutation Delegation Contract names an edit\/execute-capable specialist or an explicitly approved local execution path/);
+    assert.match(gitCleanupRule, /Never use `git commit -m`/);
+    assert.match(gitCleanupRule, /`--message`/);
+    assert.match(gitCleanupRule, /message reaches git only via `-F`/);
+    assert.match(gitCleanupRule, /In the command forms below, `<message-file>` is a placeholder/);
+    assert.match(gitCleanupRule, /replace it with a real approved path before execution/);
+    assert.match(gitCleanupRule, /approved workspace path such as `commit-message.txt` or another real path supplied by the delegation contract/);
+    assert.doesNotMatch(gitCleanupRule, /\.git\/COMMIT_EDITMSG/);
+
+    assert.match(audience, /pushed commit body is a hard stop/);
+    assert.match(audience, /route remediation through `workflow-safety-gates` and `commit-hygiene`/);
+    assert.match(audience, /rotated or revoked before any history rewrite/);
+    assert.match(audience, /Rewriting a pushed leak requires explicit approval/);
+    assert.match(audience, /must not be pushed and must be deleted/);
+    assert.match(audience, /Leaks on the default branch route out to specialized history-scrubbing support/);
+    assert.doesNotMatch(audience, /requires this remediation sequence in order/);
+
+    for (const label of ['Status', 'Validation', 'Blockers', 'Commit message', 'Body rationale', 'Validation note', 'Commit command guidance']) {
+        assert.match(outputFormat, new RegExp('^- \\*\\*' + label + ':\\*\\*', 'm'));
+    }
+    assert.match(outputFormat, /When drafting or revising, return the complete message/);
 });
 
 test('orchestrator has no GitHub tools and includes github-context-agent, pr-creation-agent, and pr-review-agent', async () => {

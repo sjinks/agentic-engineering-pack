@@ -8,7 +8,7 @@ The simplest mental model: one orchestrator controls the workflow, delegates sco
 
 The orchestrator owns workflow control, Linear MCP integration, and specialist coordination. It decides which agent runs next, tracks gate outcomes, keeps Linear access centralized through `linear/*`, and delegates GitHub operations to a three-specialist model with explicit read-write separation: `github-context-agent` for all read-only operations, `pr-creation-agent` for PR creation only, and `pr-review-agent` for review write operations only. The orchestrator calls github-context-agent for all GitHub reads (PR metadata, review comments, review history, Round-N count computation, active PR context) and passes distilled context into pr-creation-agent and pr-review-agent handoffs. Write agents do not self-service GitHub context. It delegates private Obsidian project-note reads to a narrow vault specialist. Specialist-owned work requires an actual specialist or skill invocation with returned output, failure, or blocked status; a visible handoff log alone is not delegation. Linear namespace-level grant is owned by the orchestrator because it includes mutation tools and is not an enforceable read-only model for specialists. Obsidian vault context and GitHub PR workflows use exact role-specific tool grants instead of broad namespaces.
 
-Specialist agents are isolated by role and tool permissions. Builder and Test are edit-capable for implementation and verification work, while reviewers are read-only by default so they can evaluate outcomes independently. Research handles public web facts from orchestrator-provided context without local read/search/execute, and Environment Inspector handles read-only local tooling plus repository state/history reconnaissance without web or edit. Vault Context handles narrow Obsidian project-note context with exact read-only tools, provenance, and read/not-read boundaries. GitHub Context Agent owns all GitHub read-only operations (PR metadata, review comments, review history, Round-N count computation, active PR context) with exact grants. PR Creation Agent owns GitHub PR creation only with exact grants. PR Review Agent owns review write operations (replies, thread resolution) only with exact grants and receives orchestrator-sourced GitHub context from github-context-agent. No specialist has automated VS Code workspace-folder command access; outside-workspace repositories require the operator to open or add the correct folder manually before work proceeds. Specialists receive any needed Linear/vault/GitHub context as distilled orchestrator handoffs, not by direct broad namespace access. Each skill or agent handoff is logged visibly with purpose, expected output, and out-of-scope boundaries.
+Specialist agents are isolated by role and tool permissions. Builder and Test are edit-capable for implementation and verification work, while Git Operator owns local git mechanics and reviewers are read-only by default so they can evaluate outcomes independently. Research handles public web facts from orchestrator-provided context without local read/search/execute, and Environment Inspector handles read-only local tooling plus repository state/history reconnaissance without web or edit. Vault Context handles narrow Obsidian project-note context with exact read-only tools, provenance, and read/not-read boundaries. GitHub Context Agent owns all GitHub read-only operations (PR metadata, review comments, review history, Round-N count computation, active PR context) with exact grants. PR Creation Agent owns GitHub PR creation only with exact grants. PR Review Agent owns review write operations (replies, thread resolution) only with exact grants and receives orchestrator-sourced GitHub context from github-context-agent. No specialist has automated VS Code workspace-folder command access; outside-workspace repositories require the operator to open or add the correct folder manually before work proceeds. Specialists receive any needed Linear/vault/GitHub context as distilled orchestrator handoffs, not by direct broad namespace access. Each skill or agent handoff is logged visibly with purpose, expected output, and out-of-scope boundaries.
 
 Skills act as reusable procedures and quality gates, not broad permission grants. A skill can standardize steps like commit hygiene or PR comment handling, but it does not override each agent's tool boundaries.
 
@@ -32,7 +32,7 @@ flowchart TD
     D -->|"ready or skipped/not applicable"| F{"Architecture gate"}
     E --> F
     F -->|"Scope amendments requested"| X
-    F -->|"complete or skipped"| G["Builder and Test"]
+    F -->|"complete or skipped"| G["Builder, Test, and Git Operator"]
     G --> H["Review, security, adversary, code review"]
     H --> I{"Fix cycle?"}
     I -->|"yes"| J["Test-gap plan status"]
@@ -58,6 +58,7 @@ Specialists are role-isolated agents selected by the orchestrator based on the w
 - Vault Context: narrow read-only Obsidian project-note context with provenance and read/not-read boundaries.
 - Research: external public facts, official docs, standards, release notes, advisories, vendor docs, package docs, and product/domain research.
 - Environment Inspector: read-only local tooling, package script, dependency tree, package manager, toolchain, and repository state/history reconnaissance.
+- Git Operator: local git branch, staging, commit, history cleanup, push, and pushed-visible confirmation mechanics.
 - Architect: design, interfaces, tradeoffs.
 - Builder: production edits, focused implementation.
 - Test: test changes and verification.
@@ -68,9 +69,9 @@ Specialists are role-isolated agents selected by the orchestrator based on the w
 - Independent Code Reviewer: minimal-context review to avoid implementation anchoring.
 - Integrator: synthesizes findings, arbitrates conflicts, reports readiness.
 
-Builder and Test are edit-capable; reviewers are read-only by default.
+Builder and Test are edit-capable for source/test work; reviewers are read-only by default.
 
-Builder and Test can perform local branch/commit/push git state/history mutations only when explicitly requested by a workflow or user and after the `workflow-safety-gates` git preflight and Local Git Mutation Delegation Contract pass. PR creation is delegated to `pr-creation-agent` via orchestrator coordination after readiness evidence is present. Their direct-entry files still include local hard stops for missing critical parameters, ambiguous repo/branch scope, broad staging without inspection and approval, default/base pushes, pushed/shared history rewrites without approval, and mutating probes.
+Git Operator performs local branch/commit/push git state/history mutations only when explicitly requested by a workflow or user and after the `workflow-safety-gates` git preflight and Local Git Mutation Delegation Contract pass. PR creation is delegated to `pr-creation-agent` via orchestrator coordination after readiness evidence is present.
 
 ## Components
 
@@ -92,44 +93,45 @@ It does not produce a VSIX or Marketplace extension package.
 
 | Agent | Responsibility | Tool Class |
 | --- | --- | --- |
-| [Orchestrator](../../.github/agents/agentic-engineering-orchestrator.agent.md) | Coordinates workflow, delegates to specialists, ensures gates and verification. | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*` |
-| [GitHub Context Agent](../../.github/agents/github-context-agent.agent.md) | Acquires all GitHub PR read-only context: PR metadata, review comments, review history, Round-N count computation, thread state, and active PR context. | `read`, `search`, explicit GitHub read-only frontmatter grants: `github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`, plus enumerated repository/issue/release/tag/commit/user/status reads such as `github/list_branches`, `github/list_commits`, `github/get_commit`, `github/get_file_contents`, `github/issue_read`, `github/search_code`, `github/search_pull_requests` |
-| [PR Creation Agent](../../.github/agents/pr-creation-agent.agent.md) | Creates GitHub pull requests after implementation and verification. | `read`, exact GitHub PR creation grant: `github/create_pull_request` |
-| [PR Review Agent](../../.github/agents/pr-review-agent.agent.md) | Coordinates PR review workflows, posts replies, resolves threads with orchestrator-sourced GitHub context. | `read`, `search`, `agent`, `vscode/askQuestions`, exact GitHub PR review write grants: `github/pull_request_review_write`, `github/add_reply_to_pull_request_comment`, `github.vscode-pull-request-github/resolveReviewThread` |
-| [Vault Context](../../.github/agents/vault-context-agent.agent.md) | Retrieves narrow read-only Obsidian vault context and returns distilled summaries with provenance and read/not-read boundaries. | Exact Obsidian read-only tools only |
-| [Research](../../.github/agents/research-agent.agent.md) | Gathers external public facts from orchestrator-provided context when repository context is insufficient. | `web` |
-| [Environment Inspector](../../.github/agents/environment-inspector-agent.agent.md) | Performs read-only local tooling, package script, dependency tree, toolchain, and repository state/history reconnaissance. | `read`, `search`, `execute` |
-| [Spec](../../.github/agents/spec-agent.agent.md) | Clarifies requirements, Acceptance criteria, scope, and ambiguities. | `read`, `search`, `vscode/askQuestions` |
-| [Architect](../../.github/agents/architect-agent.agent.md) | Designs implementation approach, tradeoffs, data flow, and interfaces. | `read`, `search`, `web` |
-| [Builder](../../.github/agents/builder-agent.agent.md) | Implements focused production changes following project style. | `read`, `search`, `edit`, `execute` |
-| [Test](../../.github/agents/test-agent.agent.md) | Plans tests, implements test changes, runs verification. | `read`, `search`, `edit`, `execute`, `browser` |
-| [Security Reviewer](../../.github/agents/security-reviewer-agent.agent.md) | Reviews security, privacy, and trust boundary risks through static code/config review. | `read`, `search` |
-| [Security Tester](../../.github/agents/security-tester-agent.agent.md) | Performs active security testing against authorized deployed/running targets under an Authorization Contract. | `read`, `search`, `execute`, `web` |
-| [Adversary](../../.github/agents/adversary-agent.agent.md) | Challenges assumptions and discovers failure modes. | `read`, `search` |
-| [Code Reviewer (Contextual)](../../.github/agents/code-reviewer-agent.agent.md) | Reviews code against plan, intent, and Acceptance criteria; checks correctness and regressions. | `read`, `search` |
-| [Code Reviewer (Independent)](../../.github/agents/independent-code-reviewer-agent.agent.md) | Reviews with minimal implementer context to find bugs and missing tests. | `read`, `search` |
-| [Integrator](../../.github/agents/integrator-agent.agent.md) | Synthesizes specialist findings and readiness, resolves conflicts, reports final status. | `read`, `search`, `todo` |
+| [Orchestrator](../../agentic-engineering/agents/agentic-engineering-orchestrator.agent.md) | Coordinates workflow, delegates to specialists, ensures gates and verification. | `read`, `search`, `agent`, `todo`, `vscode/askQuestions`, `linear/*` |
+| [GitHub Context Agent](../../agentic-engineering/agents/github-context-agent.agent.md) | Acquires all GitHub PR read-only context: PR metadata, review comments, review history, Round-N count computation, thread state, and active PR context. | `read`, `search`, explicit GitHub read-only frontmatter grants: `github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`, plus enumerated repository/issue/release/tag/commit/user/status reads such as `github/list_branches`, `github/list_commits`, `github/get_commit`, `github/get_file_contents`, `github/issue_read`, `github/search_code`, `github/search_pull_requests` |
+| [PR Creation Agent](../../agentic-engineering/agents/pr-creation-agent.agent.md) | Creates GitHub pull requests after implementation and verification. | `read`, exact GitHub PR creation grant: `github/create_pull_request` |
+| [PR Review Agent](../../agentic-engineering/agents/pr-review-agent.agent.md) | Coordinates PR review workflows, posts replies, resolves threads with orchestrator-sourced GitHub context. | `read`, `search`, `agent`, `vscode/askQuestions`, exact GitHub PR review write grants: `github/pull_request_review_write`, `github/add_reply_to_pull_request_comment`, `github.vscode-pull-request-github/resolveReviewThread` |
+| [Vault Context](../../agentic-engineering/agents/vault-context-agent.agent.md) | Retrieves narrow read-only Obsidian vault context and returns distilled summaries with provenance and read/not-read boundaries. | Exact Obsidian read-only tools only |
+| [Research](../../agentic-engineering/agents/research-agent.agent.md) | Gathers external public facts from orchestrator-provided context when repository context is insufficient. | `web` |
+| [Environment Inspector](../../agentic-engineering/agents/environment-inspector-agent.agent.md) | Performs read-only local tooling, package script, dependency tree, toolchain, and repository state/history reconnaissance. | `read`, `search`, `execute` |
+| [Git Operator](../../agentic-engineering/agents/git-operator-agent.agent.md) | Performs local git branch, staging, commit, history cleanup, push, and pushed-visible confirmation mechanics. | `read`, `search`, `edit`, `execute` |
+| [Spec](../../agentic-engineering/agents/spec-agent.agent.md) | Clarifies requirements, Acceptance criteria, scope, and ambiguities. | `read`, `search`, `vscode/askQuestions` |
+| [Architect](../../agentic-engineering/agents/architect-agent.agent.md) | Designs implementation approach, tradeoffs, data flow, and interfaces. | `read`, `search`, `web` |
+| [Builder](../../agentic-engineering/agents/builder-agent.agent.md) | Implements focused production changes following project style. | `read`, `search`, `edit`, `execute` |
+| [Test](../../agentic-engineering/agents/test-agent.agent.md) | Plans tests, implements test changes, runs verification. | `read`, `search`, `edit`, `execute`, `browser` |
+| [Security Reviewer](../../agentic-engineering/agents/security-reviewer-agent.agent.md) | Reviews security, privacy, and trust boundary risks through static code/config review. | `read`, `search` |
+| [Security Tester](../../agentic-engineering/agents/security-tester-agent.agent.md) | Performs active security testing against authorized deployed/running targets under an Authorization Contract. | `read`, `search`, `execute`, `web` |
+| [Adversary](../../agentic-engineering/agents/adversary-agent.agent.md) | Challenges assumptions and discovers failure modes. | `read`, `search` |
+| [Code Reviewer (Contextual)](../../agentic-engineering/agents/code-reviewer-agent.agent.md) | Reviews code against plan, intent, and Acceptance criteria; checks correctness and regressions. | `read`, `search` |
+| [Code Reviewer (Independent)](../../agentic-engineering/agents/independent-code-reviewer-agent.agent.md) | Reviews with minimal implementer context to find bugs and missing tests. | `read`, `search` |
+| [Integrator](../../agentic-engineering/agents/integrator-agent.agent.md) | Synthesizes specialist findings and readiness, resolves conflicts, reports final status. | `read`, `search`, `todo` |
 
 ### Skills
 
 | Skill | When to Use |
 | --- | --- |
-| [Expert Panel](../../.github/skills/expert-panel/SKILL.md) | Running a multi-agent panel for complex engineering decisions, architecture review, or implementation planning. |
-| [Adversarial Review](../../.github/skills/adversarial-review/SKILL.md) | Performing adversarial review, red-team analysis, edge-case discovery, and failure-mode analysis. |
-| [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md) | Applying shared workflow safety gates for critical parameters, exact-tool remote mutation allowlists, Obsidian vault context, remote MCP context, branch/git preflight and delegation contracts, PR templates, and PR review visibility/thread resolution. |
-| [Linear Issue Workflow](../../.github/skills/linear-issue-workflow/SKILL.md) | Fetching Linear issues, triaging validity, creating branches, fixing issues, and creating GitHub PRs. |
-| [PR Review Comments Workflow](../../.github/skills/pr-review-comments-workflow/SKILL.md) | User-invocable coordinator for GitHub PR review comments: context, validation, fix cycle, closure, reply/resolve. |
-| [PR Review Thread Context](../../.github/skills/pr-review-thread-context/SKILL.md) | Internal active PR/review-thread context and real-ID acquisition. |
-| [PR Review Comment Validation](../../.github/skills/pr-review-comment-validation/SKILL.md) | Internal evidence-based PR review comment classification. |
-| [PR Review Fix Cycle](../../.github/skills/pr-review-fix-cycle/SKILL.md) | Internal Builder/Test, verification, Broad Safe Validation Gate, commit, push, and visibility contract. |
-| [PR Review Round Closure](../../.github/skills/pr-review-round-closure/SKILL.md) | Internal review-cycle gatekeeper handoff preparation. |
-| [PR Review Reply Resolve](../../.github/skills/pr-review-reply-resolve/SKILL.md) | Internal reviewer-facing reply and thread-resolution contract. |
-| [Commit Hygiene](../../.github/skills/commit-hygiene/SKILL.md) | Preparing branch history for push/PR; removing no-op commits; ensuring commits are atomic and meaningful. |
-| [Conventional Commits](../../.github/skills/conventional-commits/SKILL.md) | Writing, validating, or revising Conventional Commit subject lines for pending or recent commits. |
-| [Commit Body Guidelines](../../.github/skills/commit-body-guidelines/SKILL.md) | Enforcing structured commit bodies with Rationale, Impact, and Validation sections. |
-| [Pull Request Description](../../.github/skills/pull-request-description/SKILL.md) | Generating copy/pasteable PR descriptions from branch commits and review context; on-demand only. |
-| [Review Cycle Gatekeeper](../../.github/skills/review-cycle-gatekeeper/SKILL.md) | Closing review/fix cycles by validating findings, fix evidence, thread state, and merge-readiness blockers. |
-| [Test Gap to Test Plan](../../.github/skills/test-gap-to-test-plan/SKILL.md) | Converting reviewer findings or identified test gaps into prioritized must-have test cases. |
+| [Expert Panel](../../agentic-engineering/skills/expert-panel/SKILL.md) | Running a multi-agent panel for complex engineering decisions, architecture review, or implementation planning. |
+| [Adversarial Review](../../agentic-engineering/skills/adversarial-review/SKILL.md) | Performing adversarial review, red-team analysis, edge-case discovery, and failure-mode analysis. |
+| [Workflow Safety Gates](../../agentic-engineering/skills/workflow-safety-gates/SKILL.md) | Applying shared workflow safety gates for critical parameters, exact-tool remote mutation allowlists, Obsidian vault context, remote MCP context, branch/git preflight and delegation contracts, PR templates, and PR review visibility/thread resolution. |
+| [Linear Issue Workflow](../../agentic-engineering/skills/linear-issue-workflow/SKILL.md) | Fetching Linear issues, triaging validity, creating branches, fixing issues, and creating GitHub PRs. |
+| [PR Review Comments Workflow](../../agentic-engineering/skills/pr-review-comments-workflow/SKILL.md) | User-invocable coordinator for GitHub PR review comments: context, validation, fix cycle, closure, reply/resolve. |
+| [PR Review Thread Context](../../agentic-engineering/skills/pr-review-thread-context/SKILL.md) | Internal active PR/review-thread context and real-ID acquisition. |
+| [PR Review Comment Validation](../../agentic-engineering/skills/pr-review-comment-validation/SKILL.md) | Internal evidence-based PR review comment classification. |
+| [PR Review Fix Cycle](../../agentic-engineering/skills/pr-review-fix-cycle/SKILL.md) | Internal Builder/Test, verification, Broad Safe Validation Gate, commit, push, and visibility contract. |
+| [PR Review Round Closure](../../agentic-engineering/skills/pr-review-round-closure/SKILL.md) | Internal review-cycle gatekeeper handoff preparation. |
+| [PR Review Reply Resolve](../../agentic-engineering/skills/pr-review-reply-resolve/SKILL.md) | Internal reviewer-facing reply and thread-resolution contract. |
+| [Commit Hygiene](../../agentic-engineering/skills/commit-hygiene/SKILL.md) | Preparing branch history for push/PR; removing no-op commits; ensuring commits are atomic and meaningful. |
+| [Conventional Commits](../../agentic-engineering/skills/conventional-commits/SKILL.md) | Writing, validating, or revising Conventional Commit subject lines for pending or recent commits. |
+| [Commit Body Guidelines](../../agentic-engineering/skills/commit-body-guidelines/SKILL.md) | Enforcing structured commit bodies with Rationale, Impact, and Validation sections. |
+| [Pull Request Description](../../agentic-engineering/skills/pull-request-description/SKILL.md) | Generating copy/pasteable PR descriptions from branch commits and review context; on-demand only. |
+| [Review Cycle Gatekeeper](../../agentic-engineering/skills/review-cycle-gatekeeper/SKILL.md) | Closing review/fix cycles by validating findings, fix evidence, thread state, and merge-readiness blockers. |
+| [Test Gap to Test Plan](../../agentic-engineering/skills/test-gap-to-test-plan/SKILL.md) | Converting reviewer findings or identified test gaps into prioritized must-have test cases. |
 
 ### Prompts
 
@@ -153,6 +155,7 @@ graph TD
     Orchestrator --> Architect["Architect Agent\nDesign contract status"]
     Architect --> Orchestrator
     Orchestrator --> BuildTest["Builder and Test\nimplementation, verification, dirty-state evidence"]
+    Orchestrator --> GitOperator["Git Operator\nbranch, commit, push"]
     BuildTest --> Orchestrator
     Orchestrator --> Review["Review specialists\nSecurity Reviewer, Adversary, Code Reviewers"]
     Review --> Orchestrator
@@ -378,7 +381,7 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 **Builder/Test Tier** (Edit-Capable Implementation)
 - Tools: `read`, `search`, `edit`, `execute` (plus `browser` for Test)
 - Responsibility: Implements production/test changes, runs targeted verification checks.
-- Constraint: No pull request creation. PR creation is delegated to `pr-creation-agent` via orchestrator coordination after readiness evidence is present. No branches, commits, pushes, or other git state/history mutations unless workflow or user explicitly requests and `workflow-safety-gates` passes; direct-entry hard stops still forbid unsafe git targets, broad staging without inspection and approval, default/base pushes, pushed/shared history rewrites without approval, mutating probes, and hooks in v1.
+- Constraint: No pull request creation. PR creation is delegated to `pr-creation-agent` after readiness evidence is present. Branches, commits, pushes, and other git state/history mutations are delegated to `git-operator-agent` after `workflow-safety-gates` passes.
 
 **Reviewer Tier** (Read/Search)
 - Tools: `read`, `search` for reviewers; Integrator also has `todo`.
@@ -408,7 +411,7 @@ Agents and skills declare `user-invocable: true` or `user-invocable: false`. A `
 **GitHub PR Context -> GitHub Context Agent Exact-Tool Read, Orchestrator Handoff**
 **GitHub PR Creation -> PR Creation Agent Exact-Tool Mutation**
 
-The shared source of truth is [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). In short: orchestrator owns `linear/*`, records what was read and what was not read, passes distilled evidence to specialists, and performs remote mutations only when exact-tool allowlists, approval, verification, and critical-parameter checks pass. GitHub Context Agent owns GitHub PR context acquisition via exact grants (`github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`), including PR metadata, review comments, review-thread reads, active PR context, and Round-N computation. PR Review Agent owns review write workflows only, using orchestrator/GitHub-Context-sourced context for replies and thread resolution. PR Creation Agent owns GitHub PR creation via exact grant (`github/create_pull_request`). Orchestrator coordinates handoffs to these specialists with readiness evidence. The approved PR creation operation is `mcp_github_create_pull_request`.
+The shared source of truth is [Workflow Safety Gates](../../agentic-engineering/skills/workflow-safety-gates/SKILL.md). In short: orchestrator owns `linear/*`, records what was read and what was not read, passes distilled evidence to specialists, and performs remote mutations only when exact-tool allowlists, approval, verification, and critical-parameter checks pass. GitHub Context Agent owns GitHub PR context acquisition via exact grants (`github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`), including PR metadata, review comments, review-thread reads, active PR context, and Round-N computation. PR Review Agent owns review write workflows only, using orchestrator/GitHub-Context-sourced context for replies and thread resolution. PR Creation Agent owns GitHub PR creation via exact grant (`github/create_pull_request`). Orchestrator coordinates handoffs to these specialists with readiness evidence. The approved PR creation operation is `mcp_github_create_pull_request`.
 
 GitHub remote mutations are limited to `mcp_github_create_pull_request` (pr-creation-agent only); MCP review-thread resolve/unresolve through exact `mcp_github_pull_request_review_write` `resolve_thread`/`unresolve_thread` methods with real thread node IDs (pr-review-agent only); VS Code PR extension thread resolution through exact `github.vscode-pull-request-github/resolveReviewThread` with real thread IDs (pr-review-agent only); and exact PR review reply/comment tools after pushed-visible changes or verified no-change rationale, including `mcp_github_add_reply_to_pull_request_comment` for direct replies to existing PR review comments with a proven numeric `commentId` (pr-review-agent only). Merge, PR title/body/base/head updates, branch updates, Copilot review requests, GitHub issue comments, arbitrary PR review status changes, `mcp_github_create_pull_request_with_copilot`, and repository file writes are blocked unless a future workflow explicitly adds them. GitHub repository file mutation tools remain globally denied: `mcp_github_create_or_update_file`, `mcp_github_push_files`, and `mcp_github_delete_file`.
 
@@ -420,7 +423,7 @@ Prevents: Accidental remote mutation by a specialist, false confidence from a so
 
 **Vault Context -> Exact Read-Only Tool Allowlist, Specialist Handoff**
 
-The shared source of truth is [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). In short: Obsidian vault context is delegated only to `vault-context-agent`, which has exact read-only tools rather than a broad namespace grant. Handoffs must include a narrow project, issue, component, tag, note path, decision, or risk context. The agent prefers targeted searches and partial reads, returns provenance plus read/not-read boundaries, avoids secrets/personal/unrelated areas, and treats vault notes as advisory rather than authoritative.
+The shared source of truth is [Workflow Safety Gates](../../agentic-engineering/skills/workflow-safety-gates/SKILL.md). In short: Obsidian vault context is delegated only to `vault-context-agent`, which has exact read-only tools rather than a broad namespace grant. Handoffs must include a narrow project, issue, component, tag, note path, decision, or risk context. The agent prefers targeted searches and partial reads, returns provenance plus read/not-read boundaries, avoids secrets/personal/unrelated areas, and treats vault notes as advisory rather than authoritative.
 
 Denied vault actions include runtime tools such as `mcp_obsidian_patch_vault_file`, `mcp_obsidian_update_active_file`, `mcp_obsidian_delete_active_file`, `mcp_obsidian_execute_obsidian_command`, `mcp_obsidian_execute_template`, and the corresponding mutation-side VS Code grant names. Any active-file, create/update/delete/patch/rename, command-execution, template-execution, attachment, or other side-effect tool is out of scope. If an exact read-only tool is unavailable, the workflow stops or asks instead of using a substitute vault tool. Vault content must not be passed to web tools or external services.
 
@@ -430,7 +433,7 @@ Prevents: Broad vault browsing, accidental note mutation, leaking private note c
 
 **Mutating Tool Call -> Real Critical Parameters Required**
 
-The shared source of truth is [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Mutating calls require real IDs, URLs, node IDs, thread IDs, comment IDs, Linear update values, PR numbers, repo owner/name, branches, SHAs/ranges, file SHAs, and PR template paths when relevant. Placeholders, guesses, fabricated values, stale values, examples, and mutating probes are forbidden; missing values are fetched/read first or reported as blockers.
+The shared source of truth is [Workflow Safety Gates](../../agentic-engineering/skills/workflow-safety-gates/SKILL.md). Mutating calls require real IDs, URLs, node IDs, thread IDs, comment IDs, Linear update values, PR numbers, repo owner/name, branches, SHAs/ranges, file SHAs, and PR template paths when relevant. Placeholders, guesses, fabricated values, stale values, examples, and mutating probes are forbidden; missing values are fetched/read first or reported as blockers.
 
 PR review replies and thread resolution keep extra local hard stops in the PR review workflow: direct replies to existing PR review comments require a proven numeric `commentId` for the exact comment, while `resolve_thread` requires the actual review thread node ID from GitHub PR thread data. The two identifiers are not interchangeable, and unavailable or unsafe IDs block only the affected sub-action.
 
@@ -719,7 +722,7 @@ Prevents: Fixing wrong issues, wasting effort on ambiguous or misscoped work, si
 
 **GitHub PR Creation -> Template Checked and Honored**
 
-The detailed checklist lives in [Workflow Safety Gates](../../.github/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR or publishing a PR-ready body, the workflow checks standard template locations, uses a single readable template even if other candidates are unreadable, asks the user when multiple readable templates are ambiguous, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask-or-block when a chosen template is unreadable but readable alternatives exist, or falls back explicitly when no template is found or no readable candidates exist.
+The detailed checklist lives in [Workflow Safety Gates](../../agentic-engineering/skills/workflow-safety-gates/SKILL.md). Before opening a GitHub PR or publishing a PR-ready body, the workflow checks standard template locations, uses a single readable template even if other candidates are unreadable, asks the user when multiple readable templates are ambiguous, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask-or-block when a chosen template is unreadable but readable alternatives exist, or falls back explicitly when no template is found or no readable candidates exist.
 
 The workflow composes the PR body explicitly from the selected template or fallback. It does not assume GitHub MCP/API PR creation tools will auto-apply repository templates, and it includes PR template status in final reporting whenever PR creation happens.
 
@@ -856,8 +859,8 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 1. User runs [Run Linear Issue Workflow](../../.github/prompts/run-linear-issue-workflow.prompt.md) with issue ID or URL.
 2. Orchestrator fetches issue via `linear/*` MCP, optionally delegates narrow vault context for prior decisions or Acceptance criteria, and triages validity.
 3. If invalid: proposes Linear update, asks for approval, stops.
-4. If valid: runs spec/architecture gates when triggered, creates branch, delegates to Builder and Test via orchestration workflow.
-5. After implementation, verification, review, test-gap planning when needed, and commit hygiene pass, pushes to the branch via delegated local git mechanics and confirms the pushed commits are visible on the remote.
+4. If valid: runs spec/architecture gates when triggered, creates branch via `git-operator-agent`, then delegates implementation and verification to Builder and Test.
+5. After implementation, verification, review, test-gap planning when needed, and commit hygiene pass, pushes to the branch via `git-operator-agent` and confirms the pushed commits are visible on the remote.
 6. Runs `review-cycle-gatekeeper` after remote visibility confirmation and before PR creation, passing `thread state: not applicable - no PR exists yet` with proof when no PR exists yet.
 7. Checks durable-record requirements such as shared-module prompt output and verified-internals evidence when they apply.
 8. Checks the target repository for PR templates, uses a single readable template even if other candidates are unreadable, asks when multiple readable templates are unresolved and ambiguous, reports `blocked-on-template-choice` if it cannot ask for that choice, treats `selected-template-unreadable-choice-required` as ask/block when a chosen template is unreadable but readable alternatives exist, and then selects the template or fallback body.
@@ -867,7 +870,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 
 ### Addressing PR Review Comments
 
-1. The user invokes the [PR Review Comments Workflow](../../.github/skills/pr-review-comments-workflow/SKILL.md) skill directly (it is marked `user-invocable: true`) with a PR URL or number, or asks the orchestrator to address PR review comments. There is no dedicated entry-point prompt for this workflow; the skill is the canonical entry point.
+1. The user invokes the [PR Review Comments Workflow](../../agentic-engineering/skills/pr-review-comments-workflow/SKILL.md) skill directly (it is marked `user-invocable: true`) with a PR URL or number, or asks the orchestrator to address PR review comments. There is no dedicated entry-point prompt for this workflow; the skill is the canonical entry point.
 2. The workflow acquires PR and comment context via orchestrator handoff, sourced from `github-context-agent`-owned exact GitHub frontmatter grants (`github/pull_request_read`, `github.vscode-pull-request-github/activePullRequest`) and the approved `mcp_github_pull_request_read` runtime operation. Direct invocation without github-context-agent context and without an approved active-PR read must block or route through the orchestrator; it must not imply a path to fetch PR/comments when required exact frontmatter permissions are unavailable.
 3. For each comment: validates against issue/spec/architecture/conventions/tests and optional distilled vault context when useful (Review Comment Validation Gate).
 4. Invalid comments: replies with evidence; no code change.
@@ -877,7 +880,7 @@ Prevents: Local-only fixes reported as addressed, out-of-sync PR state, addresse
 ### Final PR Description Generation
 
 1. After review/fix cycles are complete and code is ready for merge.
-2. User explicitly requests "generate PR description" or invokes [Pull Request Description](../../.github/skills/pull-request-description/SKILL.md).
+2. User explicitly requests "generate PR description" or invokes [Pull Request Description](../../agentic-engineering/skills/pull-request-description/SKILL.md).
 3. Skill generates Markdown from commit messages, commit bodies, and validation context.
 4. User copies and pastes into PR description field.
 5. Does not run automatically or edit existing descriptions; existing PR-body refreshes are copy/paste-only.

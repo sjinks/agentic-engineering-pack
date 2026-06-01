@@ -33,18 +33,6 @@ Reply to PR review threads and resolve them only after pushed-visible fixes and 
 - Composing a new top-level review via `mcp_github_pull_request_review_write` method `create` is out of scope for this pack: the agent answers existing review threads and does not initiate new review feedback.
 - If the required `commentId` is unavailable, stale, ambiguous, conflicting, or from an unsafe source, block that reply sub-action rather than switching surfaces or probing with a mutating tool.
 
-## Pending Review Lifecycle (Not Currently Available)
-
-Pending-review inline comments (`mcp_github_add_pull_request_review_comment_to_pending_review`) are not currently granted to any agent in this pack. The lifecycle below documents the design but is not an active workflow path. If pending-review inline support is restored in the future, the following rules apply:
-
-Pending-review inline comments are staged draft content, not GitHub-visible posted evidence. Treat them as posted per-thread evidence only after submit-pending-review succeeds and the submitted review/comment visibility is confirmed from the tool result or a fresh read. Staging a pending inline comment, receiving a pending comment ID, or composing a top-level review body is not enough to resolve the thread.
-
-- In direct-reply mode, a successful per-thread reply creation can satisfy the posted-evidence prerequisite for that thread.
-- In pending-review mode, reply creation and pending-review submission are separate sub-actions. Do not collapse them into `reply+resolve`.
-- If pending-review submission fails, is skipped, returns an ambiguous result, or cannot be confirmed as GitHub-visible, stop before resolution and report each affected thread as `blocked` with an operator-facing reason. If the failure happened before any per-thread reply or pending-review creation was attempted, report the affected thread as `untouched` with the reason instead.
-- If the Externally-Posted Content Gate rejects any pending-review inline comment or review body, do not submit the pending review. Rejected content is not submitted. If any rejected content was already staged, discard that pending review before any thread resolution when an approved future workflow provides that cleanup path. Report affected threads as `blocked` with an operator-facing reason; do not post the rejected content and do not resolve affected threads.
-- Resolution may proceed for a pending-review thread only after the corresponding pending inline comment is confirmed posted and all other resolution prerequisites still pass.
-
 ## Approved Resolution Surface
 
 Prefer `github.vscode-pull-request-github/resolveReviewThread` for thread resolution. Fall back to `mcp_github_pull_request_review_write` (`method=resolve_thread`/`method=unresolve_thread`) only when the VS Code PR extension surface is unavailable. Both surfaces require a real thread ID from extension/GitHub data, pushed-visible fix or verified no-change rationale, gatekeeper pass or allowed skip, and no mutating probe.
@@ -62,7 +50,7 @@ Process reply-then-resolve pairs conservatively:
 - `untouched`: reply was not attempted because a prerequisite or earlier sub-action failed.
 - `blocked`: missing real reply ID, missing direct reply `commentId`, rejected `commentId` provenance, missing real thread ID, or unavailable exact surface.
 
-These four bucket names are the active bucket set and the source of truth for reporting. When pending-review inline support is not granted, do not introduce pending-review-specific bucket names; map pending-review failures to `blocked` or `untouched` with operator-facing reasons.
+These four bucket names are the active bucket set and the source of truth for reporting.
 
 On the first per-thread reply or resolve failure, stop the loop and report counts plus thread IDs in each bucket. Do not issue duplicate replies as automatic recovery.
 

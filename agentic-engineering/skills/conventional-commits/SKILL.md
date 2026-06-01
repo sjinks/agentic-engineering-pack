@@ -27,7 +27,6 @@ Use this skill to generate, review, or apply commit messages that follow the Con
 - **Confirm real commit scope before applying.** Creating or applying commits requires real staged/unstaged scope confirmation; do not put placeholder commit SHAs/ranges or issue IDs in commit messages or footers. If scope, repository, branch, upstream, pushed/shared status, target path, or references are uncertain, draft the message only and report the blocker.
 - **Use local git execution only through an authorized specialist.** Commit creation, amend, or history rewrite must be done through local git execution by the appropriate edit/execute-capable specialist under workflow/user authorization. The orchestrator must not create commits directly.
 - **Stop when local execution is unavailable.** If authorized local execution/delegation is unavailable, stop and report blocked, or draft the message only.
-- **No GitHub file mutation substitutes.** Do not use `mcp_github_create_or_update_file`, `mcp_github_push_files`, or `mcp_github_delete_file` as commit, amend, branch-preparation, push, or recovery substitutes.
 - **Preserve unrelated user work.** If the working tree contains unrelated changes, call that out and keep the message scoped to the requested changes.
 - **Prefer one logical change per commit.** If the diff contains unrelated work, suggest splitting it into multiple commits.
 - **Avoid claiming verification that was not run.** Mention tests only when the diff or user request makes them relevant, and only report actual results.

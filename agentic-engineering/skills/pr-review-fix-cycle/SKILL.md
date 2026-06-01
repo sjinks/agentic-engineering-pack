@@ -62,14 +62,10 @@ Operator-facing evidence must include:
 
 ## Commit and Push Contract
 
-- Confirm current branch is the PR head branch.
-- Do not push to default/base branch.
-- Do not force push or rewrite pushed/shared history without explicit user approval.
-- Delegate commit and push mechanics only to the appropriate edit/execute-capable workflow specialist after branch/upstream checks and explicit workflow or user authorization.
-- Before delegating commit or push mechanics, record the Local Git Mutation Delegation Contract with exact repo, branch/ref, staging scope, command class, push target, and approval status.
-- Do not create remote GitHub branches or mutate repository files through GitHub as a fallback for local git workflow, builder/test delegation, commit hygiene, push mechanics, or failed/unavailable tooling.
+- Delegate local branch, staging, commit, amend, cleanup, push, and pushed-visible confirmation mechanics to `git-operator-agent` after branch/upstream checks and explicit workflow or user authorization.
+- Before delegating, record the Local Git Mutation Delegation Contract with exact repo, branch/ref, staging scope, command class, push target, and approval status.
+- Confirm current branch is the PR head branch. Do not push default/base branches. Do not force push or rewrite pushed/shared history without explicit user approval.
 - Do not use `git add .` or broad staging unless explicitly scoped, inspected, and approved.
-- Read-only reviewer, security, adversary, environment-inspector, and integrator agents must not commit, push, or perform local git mechanics.
 - Use atomic meaningful commits with conventional subjects and structured bodies.
 - Invoke and apply `commit-hygiene`, `conventional-commits`, and `commit-body-guidelines` before push. If any required commit skill is unavailable, blocked, or fails, stop with local-only status.
 - Push only after targeted verification and Broad Safe Validation Gate evidence are non-blocking and fresh, commit readiness has passed, and any mandatory pre-push adversarial review has completed with a non-blocking verdict, valid trivial skip, or true not-applicable evidence. `Verdict: BLOCK` blocks push readiness.
@@ -86,5 +82,5 @@ Return:
 - Equivalence-class audit report when applicable.
 - Commit readiness: commit-hygiene, Conventional Commit subject, and commit body status.
 - Pre-push adversarial review status received from the orchestrator: use the shared Pre-push Adversarial Review Status package from `agentic-engineering/shared/output-format-contract.md`.
-- Commit/push status and pushed-visible confirmation.
+- `git-operator-agent` commit/push status and pushed-visible confirmation.
 - Blockers and local-only status when push/readiness cannot proceed.
