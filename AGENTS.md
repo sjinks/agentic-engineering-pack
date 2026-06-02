@@ -40,7 +40,6 @@ When creating or updating agents and skills:
 
 Use the narrowest validation that matches the change:
 
-- Regenerate plugin artifacts when source customization content changes: `node scripts/generate-copilot-plugin.mjs --clean`
 - Lint the pack: `node scripts/lint-pack.mjs`
 - Run the test suite: `node --test tests/lint-pack.test.mjs tests/pack-workflow-contracts.test.mjs`
 
