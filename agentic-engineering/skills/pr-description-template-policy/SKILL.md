@@ -7,13 +7,13 @@ user-invocable: false
 
 # PR Description Template Policy
 
-Internal support skill for `pull-request-description`. Users should not choose this skill directly; the PR description composer invokes it before candidate PR body composition.
+Internal support skill for `pull-request-description`. Users should not choose this directly; PR description composer invokes it before candidate PR body composition.
 
 ## Direct Invocation Hard Stop
 
-If a user or operator invokes this support skill directly, stop with `blocked-direct-invocation` before resolving templates, selecting a fallback, or emitting PR body structure. Route final copy/paste PR descriptions to `pull-request-description`; route PR creation workflows to the orchestrator or `linear-issue-workflow` so the full `workflow-safety-gates` PR Template Gate and PR Body Audit Gate can run.
+If user/operator invokes this support skill directly, stop with `blocked-direct-invocation` before resolving templates, selecting fallback, or emitting PR body structure. Route final copy/paste PR descriptions to `pull-request-description`; route PR creation workflows to orchestrator or `linear-issue-workflow` so full `workflow-safety-gates` PR Template Gate and PR Body Audit Gate can run.
 
-This hard stop does not apply when `pull-request-description`, the orchestrator, or a workflow skill invokes this skill internally as part of PR body composition.
+This hard stop does not apply when `pull-request-description`, orchestrator, or workflow skill invokes this skill internally as part of PR body composition.
 
 ## Responsibility
 
@@ -42,14 +42,14 @@ Do not assume GitHub MCP/API PR creation tools will auto-apply repository templa
 
 ## Selection and Fallback Rules
 
-- Ambiguity is based on readable templates, not total candidate count. Unreadable candidates are operator-facing evidence/status only unless the user-selected or repository-convention-selected template itself is unreadable.
-- If exactly one readable template is found, return it as the selected PR body structure even if other discovered candidates are unreadable, report the unreadable candidates in operator-facing notes only, and tell `pull-request-description` to fill workflow summary, validation, issue links, review notes, risks, and follow-ups into the appropriate sections.
-- If multiple readable templates are found and repository convention clearly selects a readable one, return that template and include the convention evidence in operator-facing notes only.
-- If multiple readable templates are found and no repository convention clearly selects one, ask the user with `vscode/askQuestions` before final PR body generation. This support skill does not grant that tool; the invoking agent, typically the orchestrator, must already have `vscode/askQuestions` granted.
-- If the invoking agent lacks `vscode/askQuestions` and the operator cannot route through the orchestrator, do not silently pick a template. Return `blocked-on-template-choice`; in operator-facing notes only, list each readable candidate template path, include unreadable candidates as status evidence, summarize each readable template's structure in one sentence, name the best-guess readable template plus one-line rationale based on closest section overlap with the workflow summary, and instruct the operator to confirm a template by replying in plain text. Do not emit a final fenced PR body until the operator confirms.
-- If a user-selected or repository-convention-selected template is unreadable and at least one other candidate template is readable, return `selected-template-unreadable-choice-required`. Do not silently use the fallback template and do not silently switch to a readable alternative. Ask the user to choose a readable template or confirm fallback use; if the invoking agent cannot ask, block PR body generation and report the selected unreadable path, read error, and readable alternatives in operator-facing notes only.
-- If no template is found, return the fallback Markdown Template below with operator-facing status `no-template-fallback-used`.
-- If exactly one candidate exists and is unreadable, or every candidate is unreadable, return the fallback Markdown Template below with operator-facing status `unreadable-template-fallback-used` and include unreadable path/error summary in operator-facing notes.
+- Ambiguity based on readable templates, not total candidate count. Unreadable candidates are operator-facing evidence/status only unless user-selected or repository-convention-selected template itself is unreadable.
+- If exactly one readable template found, return it as selected PR body structure; report unreadable candidates in operator-facing notes only.
+- If multiple readable templates and repository convention clearly selects one readable template, return that template; include convention evidence in operator-facing notes only. Convention clearly selects when: documented selection rule exists; historical PR pattern consistently uses one template for current PR type/scope/team; single template naming matches documented org/repo standard. Otherwise choice is ambiguous.
+- If multiple readable templates and no clear convention, ask user with `vscode/askQuestions`. This support skill does not grant that tool; invoking agent must already have it.
+- If invoking agent lacks `vscode/askQuestions` and cannot route through orchestrator, return `blocked-on-template-choice`; in operator-facing notes only, list each readable candidate path, include unreadable candidates as status evidence, summarize each readable template's structure in one sentence, name best-guess readable template plus one-line rationale, instruct operator to confirm by replying in plain text. Do not emit final fenced PR body until operator confirms.
+- If user-selected or repository-convention-selected template is unreadable and at least one other candidate is readable, return `selected-template-unreadable-choice-required`. Do not silently use fallback or switch to readable alternative. Ask user to choose readable template or confirm fallback; if invoking agent cannot ask, block PR body generation and report selected unreadable path, read error, readable alternatives in operator-facing notes only.
+- If no template found, return fallback Markdown Template with operator-facing status `no-template-fallback-used`.
+- If exactly one candidate exists and is unreadable, or every candidate is unreadable, return fallback Markdown Template with operator-facing status `unreadable-template-fallback-used` and include unreadable path/error summary in operator-facing notes.
 
 ## Operator-Facing Template Status
 
@@ -59,9 +59,9 @@ Do not put template status, template discovery diagnostics, or fallback narratio
 
 ## PR-Body Anti-Narration Boundary
 
-The reviewer-facing PR body must not include any sentence that names the template's existence, absence, source, or fallback selection. Specifically, do not include text such as `PR template status: ...`, `No pull_request_template.md exists in the repo`, `Body follows the de-facto template observed in ...`, `template observed in the existing commit-body and PR history`, `fallback template used`, `template unreadable`, or `multiple templates with user selection`.
+Reviewer-facing PR body must not include any sentence naming template's existence, absence, source, or fallback selection. Do not include: `PR template status: ...`, `No pull_request_template.md exists in the repo`, `Body follows the de-facto template observed in ...`, `template observed in the existing commit-body and PR history`, `fallback template used`, `template unreadable`, `multiple templates with user selection`.
 
-When the composer needs to explain template selection, fallback, unreadability, or ambiguity, return that information for operator-facing notes only.
+When composer needs to explain template selection, fallback, unreadability, or ambiguity, return that information for operator-facing notes only.
 
 ## Fallback Markdown Template
 

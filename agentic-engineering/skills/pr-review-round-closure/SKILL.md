@@ -11,14 +11,14 @@ Prepare the `review-cycle-gatekeeper` handoff after PR review fixes are pushed-v
 
 ## Required Inputs
 
-- Pushed-visible status: commits are local, pushed to the PR branch, and reflected in the PR diff.
+- Pushed-visible status: commits local, pushed to PR branch, reflected in PR diff.
 - Fix commits tied to validated comments or reviewer findings.
 - Targeted verification evidence for each addressed comment.
-- Broad Safe Validation Gate evidence, including freshness evidence for the final candidate worktree/fix batch.
+- Broad Safe Validation Gate evidence, including freshness evidence for final candidate worktree/fix batch.
 - PR head SHA from fresh PR data after push visibility.
 - Fresh unresolved/reopened review-thread snapshot from `pr-review-thread-context`.
 - Reconciled findings from contextual/independent review or integrator arbitration when those ran.
-- Gatekeeper-skip basis, if the canonical `no fix cycle, gatekeeper skipped` sentinel applies.
+- Gatekeeper-skip basis: skip only when no reviewer specialists ran (e.g. triage-only outcome), or reviewers ran but produced no actionable findings. All other cases require gatekeeper invocation.
 
 ## Handoff Assembly
 
@@ -33,10 +33,9 @@ Pass to `review-cycle-gatekeeper`:
 
 ## Hard Stops
 
-- Do not invoke gatekeeper with stale thread state.
-- Do not skip gatekeeper to bypass unknown thread state, missing pushed-visible evidence, or missing broad validation evidence.
-- If the fresh thread snapshot failed and cannot be retried by an orchestrator-held read path, report the blocker so gatekeeper can emit `BLOCK` for insufficient input.
-- Do not declare the round complete, recommend merge, post reviewer-facing replies, or resolve threads while gatekeeper reports `fail` or `BLOCK`.
+- Do not invoke gatekeeper with stale thread state; do not skip gatekeeper to bypass unknown thread state, missing pushed-visible evidence, or missing broad validation evidence.
+- If fresh thread snapshot failed and cannot be retried by orchestrator-held read path, report blocker so gatekeeper can emit `BLOCK` for insufficient input.
+- Do not declare round complete, recommend merge, post reviewer-facing replies, or resolve threads while gatekeeper reports `fail` or `BLOCK`.
 
 ## Output Contract
 
