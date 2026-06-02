@@ -32,7 +32,7 @@ Verdict composition:
 - `PLAN-PARTIAL` (missing `Owner`) blocks merge.
 - `BLOCK` (missing input/unwaived blocking finding) → gatekeeper emits `BLOCK`.
 
-Skip when: documentation/formatting-only, triage-only, no severity findings. Orchestrator reports skip reason.
+Skip when: documentation/formatting-only, triage-only, no severity findings. When skipping, output `Test-gap plan status: skipped (reason: <one-line rationale>)`. This is distinct from the `no fix cycle, gatekeeper skipped` sentinel used in gatekeeper workflows when the entire fix/review cycle is bypassed. Orchestrator reports skip reason and status.
 
 ## Boundaries
 
@@ -55,8 +55,8 @@ Skip when: documentation/formatting-only, triage-only, no severity findings. Orc
 
 Emit `BLOCK` when:
 - Findings lack severity.
-- Findings use unrecognized severity labels (not `CRITICAL`/`HIGH`/`MEDIUM`/`LOW`, `High`/`Medium`/`Low`, or `Critical`/`Warning`/`Suggestion`).
-- Findings mix vocabularies (e.g., `HIGH` and `Critical` in same input).
+- Findings use unrecognized severity labels (not `CRITICAL`/`HIGH`/`MEDIUM`/`LOW`, `High`/`Medium`/`Low`, or `Critical`/`Warning`/`Suggestion`). `BLOCK` output must name the exact unrecognized labels.
+- Findings mix vocabularies (e.g., `HIGH` and `Critical` in same input). `BLOCK` output must name the specific findings or labels that use conflicting vocabularies.
 - Finding lacks location anchor.
 - Change set unknown.
 - Findings too vague to identify behavior.
@@ -64,7 +64,7 @@ Emit `BLOCK` when:
 - Coverage signals missing when target suite ambiguous.
 - Layer conventions missing when `Layer` undecidable.
 
-`BLOCK` must name missing context and concrete addition needed. Do not fabricate. When partial context available, proceed for disambiguated findings, `BLOCK` for rest, record assumptions on cases.
+`BLOCK` must name missing context and the concrete additions needed. For severity vocabulary failures, name the exact unrecognized labels; for mixed vocabularies, name the specific findings and labels that disagree. Do not fabricate. When partial context available, proceed for disambiguated findings, `BLOCK` for rest, record assumptions on cases.
 
 ## Severity Vocabulary And Priority Mapping
 

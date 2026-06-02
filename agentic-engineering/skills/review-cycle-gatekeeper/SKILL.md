@@ -36,7 +36,7 @@ Typical triggers: reviewer findings addressed in follow-up commits; unresolved/r
 - Findings list with severity and current status.
 - Fix summary or commit list tied to findings.
 - Verification evidence: targeted verification and Broad Safe Validation Gate evidence when PR-review fixes in scope. Broad evidence: status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`), repository discovery, candidate commands, selection conclusion, classification, dirty-state boundary, freshness for final worktree/fix batch, proceed/block effect, residual risk, next action. Stale/unknown freshness → `BLOCK`.
-- Unresolved/reopened thread list (empty valid, unknown not). Must be fresh read after PR head SHA reaches current value, immediately before invocation. Stale snapshots invalid; unknown → `BLOCK`.
+- Unresolved/reopened thread list (empty valid, unknown not). Must be read after the PR head SHA reaches the current value, and the PR head SHA at the time of the thread read must match the PR head SHA at the time of gatekeeper invocation. A mismatch means the snapshot is stale and input is invalid; produce `BLOCK`. Unknown thread state or stale snapshots → `BLOCK`.
 - Pushed-visible state per `workflow-safety-gates` Glossary. Each `fixed` finding's fix commit MUST be reachable from PR head SHA. Unknown → `BLOCK`.
 
 ## Severity Vocabulary
