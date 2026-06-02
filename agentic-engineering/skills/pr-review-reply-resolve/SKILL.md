@@ -11,39 +11,27 @@ Reply to PR review threads and resolve them only after pushed-visible fixes and 
 
 ## Preconditions
 
-- Fix-backed replies have pushed-visible fix commits. Verified no-change, disagreement, and clarification replies are verified against current PR state and carry evidence citation/provenance instead of a fix commit SHA.
-- `review-cycle-gatekeeper` returned `pass`, or the canonical `no fix cycle, gatekeeper skipped` sentinel is allowed.
-- Fresh thread/comment IDs came from `pr-review-thread-context` or other real GitHub/VS Code PR extension data.
-- Required reply target and thread node ID are available for the specific sub-action. Direct existing-comment replies require a numeric `commentId` with provenance accepted by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate; thread resolution requires the review thread node ID.
-- Reviewer-facing text passes the `workflow-safety-gates` Externally-Posted Content Gate.
+- Fix-backed replies have pushed-visible fix commits. Verified no-change, disagreement, clarification replies verified against current PR state with evidence citation/provenance instead of fix commit SHA.
+- `review-cycle-gatekeeper` returned `pass`, or canonical `no fix cycle, gatekeeper skipped` sentinel allowed (only when no reviewer specialists ran, or reviewers produced no actionable findings).
+- Fresh thread/comment IDs from `pr-review-thread-context` or other real GitHub/VS Code PR extension data.
+- Required reply target and thread node ID available for specific sub-action. Direct existing-comment replies require numeric `commentId` with provenance accepted by `workflow-safety-gates` Direct Review Comment Reply ID Provenance Gate; thread resolution requires review thread node ID.
+- Reviewer-facing text passes `workflow-safety-gates` Externally-Posted Content Gate.
 
 ## Reply Before Resolve
 
-- For every addressed thread whose cited file or region was touched by the pushed fix commits, post a per-thread evidence reply before resolving.
-- The reply names the relevant fix commit SHA as plain text and gives a one-line summary of what changed.
-- For every fix-backed reply, include the relevant pushed-visible fix commit SHA as plain text plus the reviewer-relevant summary and test evidence when applicable.
-- For verified no-change, disagreement, and clarification replies that are not fix-backed and do not correspond to touched cited files or regions, cite the evidence/provenance for the decision and do not require or invent a fix commit SHA.
-- Thread classification does not exempt a touched file/region from the evidence reply; invalid, out-of-scope, and needs-clarification threads still require the reply when the pushed diff touched the cited file or region.
-- A top-level review submission body, batch summary, outdated status, or resolution call does not substitute for the per-thread evidence reply.
-- Resolve only with the actual review thread node ID. Reply only with the actual per-comment reply/database ID required by the selected reply surface. Direct existing-comment replies use `mcp_github_add_reply_to_pull_request_comment` with params `owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`.
+- For every addressed thread whose cited file or region touched by pushed fix commits, post per-thread evidence reply before resolving.
+- Reply names relevant fix commit SHA as plain text and gives one-line summary of what changed.
+- For every fix-backed reply, include relevant pushed-visible fix commit SHA as plain text plus reviewer-relevant summary and test evidence when applicable.
+- For verified no-change, disagreement, clarification replies that are not fix-backed and do not correspond to touched cited files/regions, cite evidence/provenance for decision and do not require or invent fix commit SHA.
+- Thread classification does not exempt touched file/region from evidence reply; invalid, out-of-scope, needs-clarification threads still require reply when pushed diff touched cited file or region.
+- Top-level review submission body, batch summary, outdated status, or resolution call does not substitute for per-thread evidence reply.
+- Resolve only with actual review thread node ID. Reply only with actual per-comment reply/database ID required by selected reply surface. Direct existing-comment replies use `mcp_github_add_reply_to_pull_request_comment` with params `owner`, `repo`, `pullNumber`, numeric `commentId`, `body`.
 
 ## Reply Surface Selection
 
 - Direct existing-comment mode is the only active reply surface in this pack. Use only `mcp_github_add_reply_to_pull_request_comment` with `owner`, `repo`, `pullNumber`, numeric `commentId`, and `body`, after the Direct Review Comment Reply ID Provenance Gate passes.
 - Composing a new top-level review via `mcp_github_pull_request_review_write` method `create` is out of scope for this pack: the agent answers existing review threads and does not initiate new review feedback.
 - If the required `commentId` is unavailable, stale, ambiguous, conflicting, or from an unsafe source, block that reply sub-action rather than switching surfaces or probing with a mutating tool.
-
-## Pending Review Lifecycle (Not Currently Available)
-
-Pending-review inline comments (`mcp_github_add_pull_request_review_comment_to_pending_review`) are not currently granted to any agent in this pack. The lifecycle below documents the design but is not an active workflow path. If pending-review inline support is restored in the future, the following rules apply:
-
-Pending-review inline comments are staged draft content, not GitHub-visible posted evidence. Treat them as posted per-thread evidence only after submit-pending-review succeeds and the submitted review/comment visibility is confirmed from the tool result or a fresh read. Staging a pending inline comment, receiving a pending comment ID, or composing a top-level review body is not enough to resolve the thread.
-
-- In direct-reply mode, a successful per-thread reply creation can satisfy the posted-evidence prerequisite for that thread.
-- In pending-review mode, reply creation and pending-review submission are separate sub-actions. Do not collapse them into `reply+resolve`.
-- If pending-review submission fails, is skipped, returns an ambiguous result, or cannot be confirmed as GitHub-visible, stop before resolution and report each affected thread as `blocked` with an operator-facing reason. If the failure happened before any per-thread reply or pending-review creation was attempted, report the affected thread as `untouched` with the reason instead.
-- If the Externally-Posted Content Gate rejects any pending-review inline comment or review body, do not submit the pending review. Rejected content is not submitted. If any rejected content was already staged, discard that pending review before any thread resolution when an approved future workflow provides that cleanup path. Report affected threads as `blocked` with an operator-facing reason; do not post the rejected content and do not resolve affected threads.
-- Resolution may proceed for a pending-review thread only after the corresponding pending inline comment is confirmed posted and all other resolution prerequisites still pass.
 
 ## Approved Resolution Surface
 
@@ -77,3 +65,17 @@ Return:
 - Reply/resolve execution status by thread.
 - Partial failure buckets with counts and real thread IDs.
 - Threads intentionally not replied to or not resolved, with operator-facing reasons.
+
+---
+
+## Pending Review Lifecycle (Not Currently Available - Documented for Future Restoration)
+
+Pending-review inline comments (`mcp_github_add_pull_request_review_comment_to_pending_review`) are not currently granted to any agent in this pack. The lifecycle below documents the design but is not an active workflow path. If pending-review inline support is restored in the future, the following rules apply:
+
+Pending-review inline comments are staged draft content, not GitHub-visible posted evidence. Treat them as posted per-thread evidence only after submit-pending-review succeeds and the submitted review/comment visibility is confirmed from the tool result or a fresh read. Staging a pending inline comment, receiving a pending comment ID, or composing a top-level review body is not enough to resolve the thread.
+
+- In direct-reply mode, a successful per-thread reply creation can satisfy the posted-evidence prerequisite for that thread.
+- In pending-review mode, reply creation and pending-review submission are separate sub-actions. Do not collapse them into `reply+resolve`.
+- If pending-review submission fails, is skipped, returns an ambiguous result, or cannot be confirmed as GitHub-visible, stop before resolution and report each affected thread as `blocked` with an operator-facing reason. If the failure happened before any per-thread reply or pending-review creation was attempted, report the affected thread as `untouched` with the reason instead.
+- If the Externally-Posted Content Gate rejects any pending-review inline comment or review body, do not submit the pending review. Rejected content is not submitted. If any rejected content was already staged, discard that pending review before any thread resolution when an approved future workflow provides that cleanup path. Report affected threads as `blocked` with an operator-facing reason; do not post the rejected content and do not resolve affected threads.
+- Resolution may proceed for a pending-review thread only after the corresponding pending inline comment is confirmed posted and all other resolution prerequisites still pass.

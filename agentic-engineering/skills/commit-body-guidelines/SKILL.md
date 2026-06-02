@@ -7,77 +7,61 @@ user-invocable: true
 
 # Commit Body Guidelines
 
-Use this skill when a commit message needs a required body that explains the reasoning behind the change. The body should be structured, concise, and useful to reviewers or future maintainers who need to understand why the change exists.
+Use when a commit message needs a required body explaining the reasoning. The body should be structured, concise, and useful to reviewers or maintainers.
 
-This skill complements `conventional-commits`: use Conventional Commits for the summary line and this skill for the body content.
+This skill complements `conventional-commits`: use Conventional Commits for the summary line and this skill for the body.
 
 ## Core Rule
 
-Always include a commit body. The body must explain the reasoning behind the change, not merely restate the diff.
-
-For trivial changes, such as formatting-only commits, a concise body is acceptable:
-
-```text
-No functional changes.
-```
+Always include a commit body. The body explains reasoning, not merely restating the diff. For trivial changes such as formatting-only commits, a concise body is acceptable: `No functional changes.`
 
 ## Safety Rules
 
-- **Apply workflow-safety-gates before executable commit guidance.** Before creating, amending, applying, or recommending executable commit commands, apply `workflow-safety-gates` and confirm the real target workspace/repo, current branch, default/base branch, upstream/remote, dirty/staged/unstaged scope, pushed/shared status, and exact target range/branch/SHA/path where relevant.
-- **Draft only when scope is uncertain.** If the target repository, branch, upstream, dirty/staged/unstaged scope, pushed/shared status, target range, target path, or commit-ish values are ambiguous, draft or revise the message only and report the blocker.
-- **Use local git execution only through an authorized specialist.** Commit creation, amend, or history rewrite must be done through local git execution by the appropriate edit/execute-capable specialist under workflow/user authorization. The orchestrator must not create commits directly.
-- **Stop when local execution is unavailable.** If authorized local execution/delegation is unavailable, stop and report blocked, or draft the message only.
-- **No GitHub file mutation substitutes.** Do not use `mcp_github_create_or_update_file`, `mcp_github_push_files`, or `mcp_github_delete_file` as commit, amend, branch-preparation, push, or recovery substitutes.
-- **Pass message text via `-F <message-file>` only.** Commit messages must reach git via `-F <message-file>` from a file written by an authorized file-write tool. Never use `git commit -m "..."`, `-m '...'`, `echo ... > file`, `printf ... > file`, `cat <<EOF`, or any other shell-interpolated path for the message. See `workflow-safety-gates` "Shell-Safe Local Execution" for the canonical rule.
+- **Apply `workflow-safety-gates` before executable commit guidance.** Confirm real target workspace/repo, current branch, default/base branch, upstream/remote, dirty/staged/unstaged scope, pushed/shared status, exact range/branch/SHA/path.
+- **Draft only when scope uncertain.** If ambiguous, draft/revise message only and report blocker.
+- **Use local git execution only through authorized specialist.** Commit creation/amend/history rewrite requires workflow/user authorization.
+- **Stop when local execution unavailable.**
+- **No GitHub file mutation substitutes.** Do not use `mcp_github_*` as commit/amend/push substitutes.
+- **Pass message via `-F <message-file>` only.** Never use `git commit -m`, `-m '...'`, echo/printf/heredoc. See `workflow-safety-gates` "Shell-Safe Local Execution".
 
 ## Body Structure
 
-Use the relevant Markdown section headers in this order. Omit sections that do not add useful information; do not include empty or filler sections.
+Use relevant Markdown section headers in order. Omit sections without useful information; no empty/filler sections.
 
 ```markdown
 ## Purpose and Context
 
-Explain what problem this change addresses or what feature it implements.
-Mention relevant background, motivation, constraints, or related issues.
+Explain problem, feature, background, motivation, constraints, related issues.
 
 ## Key Changes
 
-- List the most important code-level changes.
-- Include new functions, refactored components, deleted code, config
-  changes, dependency updates, or API changes.
+- List important code-level changes: functions, refactoring, deletions, config changes, dependencies, API changes.
 
 ## Impact and Considerations
 
-Note impact on system behavior, performance, security, compatibility,
-deployment, data, configuration, or user experience.
-
-Mention migrations, configuration changes, rollout concerns, limitations,
-or known side effects when relevant.
+Note impact on behavior, performance, security, compatibility, deployment, data, configuration, UX. Mention migrations, config changes, rollout concerns, limitations, side effects.
 
 ## Testing and Validation
 
-Describe tests that were added, updated, or run.
-
-Describe manual validation performed or still required. If validation was
-not run, state that clearly.
+Describe tests added/updated/run. Describe manual validation. If not run, state clearly.
 ```
 
-Prefer keeping `Purpose and Context` because the body must explain why the change exists. Include `Testing and Validation` when the change was tested, should have been tested, or needs an explicit note that validation was not run. Omit `Key Changes` or `Impact and Considerations` when the summary and remaining body already cover the relevant information clearly.
+Prefer `Purpose and Context` (body must explain why). Include `Testing and Validation` when tested, should have been tested, or needs explicit note validation wasn't run. Omit `Key Changes` or `Impact and Considerations` when summary/remaining body already covers the information.
 
 ## Optional Signals
 
-Include these details only when they are relevant and useful:
+Include only when relevant:
 
-- **Related work:** Issue, ticket, pull request, or project references.
-- **Decision notes:** Why this approach was chosen over obvious alternatives.
-- **Compatibility:** API, CLI, config, data format, migration, or deprecation notes.
-- **Risk and rollout:** Feature flags, deployment order, rollback path, or operational concerns.
-- **Security and privacy:** Auth, permissions, tenancy, secrets, PII, logging, or data exposure impact.
-- **Performance:** Expected performance effect, tradeoff, or measurement result.
-- **Follow-up work:** Concrete follow-up tasks that are intentionally out of scope.
-- **Trailers:** `BREAKING CHANGE:`, `Fixes`, `Closes`, `Refs`, `Co-authored-by:`, or other repository-standard trailers.
+- **Related work:** Issue/ticket/PR/project references.
+- **Decision notes:** Why this approach over alternatives.
+- **Compatibility:** API/CLI/config/data format/migration/deprecation notes.
+- **Risk and rollout:** Feature flags, deployment order, rollback, operations.
+- **Security and privacy:** Auth, permissions, tenancy, secrets, PII, logging, data exposure.
+- **Performance:** Effect, tradeoff, measurement.
+- **Follow-up:** Concrete out-of-scope tasks.
+- **Trailers:** `BREAKING CHANGE:`, `Fixes`, `Closes`, `Refs`, `Co-authored-by:`, repository-standard trailers.
 
-Do not add optional signals just to fill space. The body should answer what the diff cannot: why the change exists, what reviewers should notice, and what future maintainers must not miss.
+Do not add to fill space. The body should answer what the diff cannot: why the change exists, what reviewers should notice, what maintainers must not miss.
 
 ## Audience and Content
 
@@ -91,7 +75,7 @@ The body must contain only content useful to those audiences:
 - Validation honestly described in plain engineering terms.
 - Issue/ticket references when they explain the context.
 
-The forbidden categories, positive rules, authorship-disclosure carve-out, and anti-pattern example are defined canonically in `workflow-safety-gates` Externally-Posted Content Gate. This section adds commit-body-specific guidance only.
+First apply `workflow-safety-gates` Externally-Posted Content Gate. Then apply commit-body-specific forbidden content below. The forbidden categories, positive rules, authorship-disclosure carve-out, and anti-pattern example are defined canonically in `workflow-safety-gates` Externally-Posted Content Gate. This section adds commit-body-specific guidance only.
 
 **Commit-body-specific forbidden content (in addition to the Externally-Posted Content Gate Forbidden list).** Because commit bodies are durable history — re-cloned, mirrored, indexed, and operationally expensive to scrub — never paste any of the following into a commit body, even when the diff happens to include them:
 

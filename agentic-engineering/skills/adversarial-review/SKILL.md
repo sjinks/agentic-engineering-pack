@@ -7,46 +7,35 @@ user-invocable: true
 
 # Adversarial Review
 
-Use this skill to deliberately challenge a concrete artifact before relying on it: a spec, design, implementation, workflow, runbook, migration, security control, or test plan.
-
-The goal is to expose plausible failure modes, separate evidence from speculation, and turn the highest risks into tests, mitigations, or Acceptance criteria. Be skeptical, precise, and constructive rather than hostile or cynical.
+Deliberately challenge a concrete artifact before relying on it. Expose plausible failure modes, separate evidence from speculation, and convert the highest risks into tests, mitigations, or Acceptance criteria.
 
 ## When to Use
 
-Use this skill when performing adversarial review, red-team analysis, edge-case discovery, failure-mode analysis, misuse review, regression hunting, risk-focused test planning, or pre-ship challenge of an artifact whose failure would matter.
-
-Use it for specs, designs, implementations, workflows, migrations, operational procedures, and test plans. Do not reduce the review to code-only comments unless the target is only code.
+Use when performing adversarial review, red-team analysis, edge-case discovery, failure-mode analysis, misuse review, regression hunting, risk-focused test planning, or pre-ship challenge of an artifact whose failure would matter. Applies to specs, designs, implementations, workflows, migrations, operational procedures, and test plans.
 
 ## Boundaries
 
-- Review only artifacts and systems the user is authorized to inspect.
-- Keep findings actionable, evidence-based, and tied to the target.
-- Do not require a fixed number of issues or persona sections. A `CLEAN` verdict is valid when no actionable findings are found after review.
-- Do not include exploit instructions, weaponizable payloads, live attack steps, or guidance for abusing real systems.
-- Do not exercise the target against live systems, users, or production data; reason from artifacts and non-destructive local inspection only.
+- Review only authorized artifacts; keep findings actionable, evidence-based, and tied to the target.
+- `CLEAN` is valid when no actionable findings exist after review; no fixed number required.
+- No exploit instructions, weaponizable payloads, or live attack guidance.
+- No live system, user, or production data exercise; reason from artifacts and local inspection only.
 - Clearly separate confirmed defects, likely risks, open questions, accepted tradeoffs, and test gaps.
 
 ## Required Input Context
 
-Collect or read the narrowest useful context before judging:
+Collect narrowest useful context: target artifact/type, intended behavior, success criteria, requirements, non-goals, actors/permissions/boundaries, inputs/outputs/dependencies, lifecycle/state/error paths, existing tests/verification/monitoring.
 
-- Target artifact and content type: spec, design, implementation, workflow, test plan, or other.
-- Intended behavior, success criteria, explicit requirements, and non-goals.
-- Actors, users, tenants, permissions, data boundaries, and trust boundaries when relevant.
-- Inputs, outputs, dependencies, lifecycle, state transitions, rollback paths, and error paths.
-- Existing tests, verification evidence, monitoring, runbooks, or Acceptance criteria.
-
-Halt and ask for more context, or report a blocker, when the target is empty, missing, unreadable, or too vague to identify intended behavior. If context is partial but usable, proceed with explicitly listed assumptions and caveats. If the assistant halts to ask for context instead of emitting a verdict, the halt must still include the `Target`, best-effort `Intended behavior`, and the specific missing context; otherwise emit `BLOCK`.
+Halt or report blocker when target is empty, missing, unreadable, or too vague. If partial but usable, proceed with explicit assumptions. Any halt must still include `Target`, best-effort `Intended behavior`, and specific missing context; otherwise emit `BLOCK`.
 
 ## Optional Review Lenses
 
-Apply the lenses that fit the target. Do not force every lens into the output.
+Apply lenses that fit the target; do not force every lens.
 
-- **Breaker/reliability:** What realistic edge, failure, ordering, timeout, or dependency condition breaks the promise?
-- **Maintainer:** What future change, unclear contract, duplicated rule, or hidden coupling makes the artifact easy to misuse or regress?
-- **Security/privacy:** What permission, identity, tenancy, data exposure, misuse, or trust-boundary failure is plausible?
-- **User/workflow:** Where can a user become stuck, confused, misled, blocked, or lose work?
-- **Verification:** What important behavior is unproved, unobservable, or only tested through an unrealistic mock?
+- **Breaker/reliability:** Realistic edge/failure/ordering/timeout/dependency breaks.
+- **Maintainer:** Future change, unclear contract, duplication, or coupling enabling misuse/regression.
+- **Security/privacy:** Permission, identity, tenancy, data exposure, or trust-boundary failures.
+- **User/workflow:** User becomes stuck, confused, misled, blocked, or loses work.
+- **Verification:** Important behavior unproved, unobservable, or only tested via unrealistic mock.
 
 ## Failure-Mode Taxonomy
 
@@ -100,15 +89,12 @@ Every substantive finding must name a concrete trigger or scenario. Do not prese
 
 ## Procedure
 
-1. Identify the target artifact and content type.
-2. Read the available artifact and nearby context needed to understand it.
-3. State the intended behavior in one or two sentences.
-4. List assumptions the review depends on, including missing context.
-5. Challenge those assumptions using the relevant lenses and taxonomy.
-6. Deduplicate overlapping findings so the same risk is not reported multiple ways.
-7. Rank findings by severity, impact, likelihood, and confidence.
-8. Convert the top risks into concrete adversarial tests, mitigations, or Acceptance criteria.
-9. Assign the overall verdict.
+1. Identify target artifact/type; read available artifact and needed context.
+2. State intended behavior in one or two sentences; list assumptions.
+3. Challenge assumptions using relevant lenses/taxonomy; deduplicate overlapping findings.
+4. Rank by severity, impact, likelihood, confidence.
+5. Convert top risks into concrete adversarial tests, mitigations, or Acceptance criteria.
+6. Assign overall verdict.
 
 ## Output Format
 

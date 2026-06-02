@@ -7,24 +7,23 @@ user-invocable: true
 
 # Pull Request Description
 
-This skill generates final, copy/pasteable Markdown PR descriptions from the current branch commits and verification context once development and review/fix iterations are complete, or whenever the user explicitly asks. It remains the user-invocable composer; internal support skills handle PR template policy and final PR body audit.
+Generates final, copy/pasteable Markdown PR descriptions from current branch commits and verification context once development and review/fix iterations complete, or whenever user explicitly asks. Development and review/fix cycles complete when all review comments addressed and pushed-visible, gatekeeper passed or allowed skip applies, no unresolved review threads remain. Explicit user requests for body generation or refresh may still invoke skill for draft or body-only result. User-invocable composer; internal support skills handle PR template policy and final PR body audit.
 
 ## When to Use
-- Finalizing a PR description after implementation, verification, and review/fix cycles are complete.
-- Producing PR description Markdown when the user explicitly asks.
-- Preparing refreshed PR description content after commit hygiene and final review outcomes are settled, for the user to copy and paste.
-- Reviewing whether a PR description matches branch changes.
+
+- Finalizing PR description after implementation, verification, review/fix cycles complete (all review comments addressed and pushed-visible, gatekeeper passed or allowed skip applies, no unresolved review threads).
+- Producing PR description Markdown when user explicitly asks (draft or body-only when review cycles still active).
+- Preparing refreshed PR description content after commit hygiene and final review outcomes settled, for user to copy/paste.
+- Reviewing whether PR description matches branch changes.
 
 ## Safety Rules
+
 - Generate copy/pasteable Markdown only; do not edit existing PR descriptions.
-- If the user asks to update an existing PR body, return the prepared body plus blocked status: remote PR title/body updates are not currently approved by `workflow-safety-gates` unless a future exact PR-body-update workflow is added.
+- If user asks to update existing PR body, return prepared body plus blocked status: remote PR title/body updates not currently approved by `workflow-safety-gates` unless future exact PR-body-update workflow added.
 - Do not call GitHub MCP mutation tools for PR body updates, and do not use any substitute remote mutation path for existing PR descriptions.
-- Do not treat this skill as a required step before every PR creation or PR update; use it when finalizing or when explicitly requested.
+- Do not treat this skill as required step before every PR creation or update; use when finalizing or explicitly requested.
 - Do not ask users to choose internal support skills. Invoke `pr-description-template-policy` and `pr-description-body-audit` as part of this composer workflow.
-- Inspect commits before summarizing.
-- Preserve user-provided or repository Pull Request Template sections when supplied or discovered through `pr-description-template-policy`.
-- Do not claim tests/reviews/security checks that were not run.
-- Do not include secrets or sensitive data.
+- Inspect commits before summarizing; preserve user-provided or repository Pull Request Template sections; do not claim tests/reviews/security checks not run; do not include secrets or sensitive data.
 
 ## Required Inputs / Context
 - Base branch and current branch.
@@ -38,14 +37,14 @@ This skill generates final, copy/pasteable Markdown PR descriptions from the cur
 - PR title (drafted by `conventional-commits` in Conventional Commit subject style) when the workflow is preparing for PR creation or when the user asks for a title alongside the body.
 
 ## Inspection Procedure
+
 1. Identify base branch and current branch.
-2. List commits in range.
-3. Inspect commit subjects and bodies, using conventional-commits and commit-body-guidelines as source quality signals.
-4. Summarize changed files/high-level diff.
-5. Collect validation and review evidence from workflow handoff or local checks.
-6. Before candidate composition, invoke `pr-description-template-policy` to resolve Pull Request Template discovery, selection, fallback, blocked template-choice states, and operator-facing template status. If template choice is blocked, return the operator-facing blocker and do not emit a final fenced PR body.
-7. Generate the candidate copy/pasteable Markdown body from the selected template or fallback structure, commits, issue links, validation, review notes, risks, and follow-ups.
-8. Before final fenced Markdown emission, invoke `pr-description-body-audit` against the complete candidate body, selected template status, validation evidence, synthesis pre-push status, and any Verified non-changes items. Emit the repaired body only when the audit passes or repairs it; block instead of emitting when the audit reports blocked.
+2. List commits in range; inspect subjects and bodies, using conventional-commits and commit-body-guidelines as source quality signals.
+3. Summarize changed files/high-level diff.
+4. Collect validation and review evidence from workflow handoff or local checks.
+5. Before candidate composition, invoke `pr-description-template-policy` to resolve Pull Request Template discovery, selection, fallback, blocked template-choice states, operator-facing template status. If template choice blocked, return operator-facing blocker and do not emit final fenced PR body.
+6. Generate candidate copy/pasteable Markdown body from selected template or fallback structure, commits, issue links, validation, review notes, risks, follow-ups.
+7. Before final fenced Markdown emission, invoke `pr-description-body-audit` against complete candidate body, selected template status, validation evidence, synthesis pre-push status, any Verified non-changes items. Emit repaired body only when audit passes or repairs it; block when audit reports blocked.
 
 ## Description Rules
 - Use commits as source of truth but consolidate duplicate/fixup history after commit hygiene.
@@ -63,8 +62,9 @@ This skill generates final, copy/pasteable Markdown PR descriptions from the cur
 
 ## PR Title Rules
 
-- This skill generates the PR body. The PR title is generated by `conventional-commits` and must be a single Conventional Commit subject line (for example `fix(auth): refresh expired sessions before retry`).
-- When the user asks for a complete PR (title plus body), invoke `conventional-commits` for the title before returning, and include the title verbatim alongside the body in the operator-facing notes (not inside the fenced PR body code block).
+- `conventional-commits` owns PR title generation, validation, type selection, and scope selection. This skill owns PR body generation only.
+- When a PR title is requested, invoke `conventional-commits` for the title and return the title separately in operator-facing notes (not inside the fenced PR body code block).
+- When the user asks for a complete PR (title plus body), invoke `conventional-commits` for the title before returning, and include the title verbatim alongside the body in the operator-facing notes.
 - Do not embed the issue key, Linear key, or JIRA key in the PR title unless the target repository convention requires it; the key belongs in the PR body. The conventional subject must remain readable as a subject.
 - If the workflow has multiple commits with different types, choose the title type that best describes the user-visible or maintenance impact of the PR as a whole.
 - Do not use the structured `commit-body-guidelines` body inside the PR title; the title is a subject line only.

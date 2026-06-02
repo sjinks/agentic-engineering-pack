@@ -7,11 +7,11 @@ user-invocable: true
 
 # Expert Panel
 
-Use this skill to structure a lightweight expert panel for complex engineering work. The panel should stay proportional to the task: use only the roles that add real value.
+Structure lightweight expert panel for complex engineering work. Panel should stay proportional to task: use only roles that add real value.
 
 ## When to Use
 
-Use this skill to run a multi-agent expert panel for complex engineering decisions: architecture review, implementation planning, testing strategy, risk assessment, and final synthesis. Use only the roles that add real value for the specific decision; skip roles that would add overhead without changing the outcome.
+Run multi-agent expert panel for complex engineering decisions: architecture review, implementation planning, testing strategy, risk assessment, final synthesis. Use only roles that add real value for specific decision; skip roles adding overhead without changing outcome.
 
 ## Roles
 
@@ -30,15 +30,16 @@ The lightweight panel below covers the most common engineering decisions. Four a
 - Review Cycle Gatekeeper (`review-cycle-gatekeeper` skill): per-round closure check after at least one review-fix cycle; consumes the integrator's reconciled findings (when integrator arbitration ran) or the reviewers' findings directly, plus pushed-visible status, and produces a `pass | fail | BLOCK` gate decision under the canonical severity vocabulary.
 
 ## Procedure
-1. Define the goal, constraints, and current evidence.
-2. Select the smallest useful panel.
+
+1. Define goal, constraints, current evidence.
+2. Select smallest useful panel.
 3. Before each panel role invocation, log `Handoff: <skill|agent> <name> - <purpose>; expected output: <...>; out of scope: <...>`, then actually invoke that role and wait for output, failure, or blocked status before proceeding.
-4. Use `vault-context-agent` only when private project-note context is useful, after applying the `workflow-safety-gates` Obsidian Vault Context Gate. The handoff must include a narrow query and read boundaries, and the output must include provenance plus read/not-read boundaries.
-5. Give each role a narrow prompt with explicit output needs and non-goals.
-6. Compare findings for conflicts, duplicate concerns, and missing coverage.
-7. Ask one targeted question only when the panel cannot proceed without user input.
-8. When the panel ran reviewer roles AND at least one fix cycle, invoke `review-cycle-gatekeeper` before final synthesis to consume the integrator's reconciled findings (when integrator arbitration ran) or the reviewers' findings directly, plus pushed-visible status; do not produce the integrated answer while the gatekeeper reports `fail` or `BLOCK`. Skip the gatekeeper only in the cases the `workflow-safety-gates` Glossary "Gatekeeper-skip sentinel" enumerates — (a) no reviewer specialists ran, or (b) reviewer specialists ran but produced no actionable findings — and explicitly note the canonical sentinel `no fix cycle, gatekeeper skipped` in the panel output.
-9. Produce an integrated answer with decisions, validation, and residual risk.
+4. Use `vault-context-agent` only when private project-note context useful, after applying `workflow-safety-gates` Obsidian Vault Context Gate. Handoff must include narrow query and read boundaries; output must include provenance plus read/not-read boundaries.
+5. Give each role narrow prompt with explicit output needs and non-goals.
+6. Compare findings for conflicts, duplicate concerns, missing coverage.
+7. Ask one targeted question only when panel cannot proceed without user input.
+8. When panel ran reviewer roles AND at least one fix cycle, invoke `review-cycle-gatekeeper` before final synthesis to consume integrator's reconciled findings (when integrator arbitration ran) or reviewers' findings directly, plus pushed-visible status; do not produce integrated answer while gatekeeper reports `fail` or `BLOCK`. Skip gatekeeper only in cases `workflow-safety-gates` Glossary "Gatekeeper-skip sentinel" enumerates — (a) no reviewer specialists ran, or (b) reviewer specialists ran but produced no actionable findings — and explicitly note canonical sentinel `no fix cycle, gatekeeper skipped` in panel output.
+9. Produce integrated answer with decisions, validation, residual risk.
 
 ## Audience
 

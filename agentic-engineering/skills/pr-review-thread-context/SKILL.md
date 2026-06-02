@@ -7,14 +7,14 @@ user-invocable: false
 
 # PR Review Thread Context
 
-Acquire PR review context and real identifiers for `pr-review-comments-workflow` from orchestrator-sourced github-context-agent reads. This skill is internal: the user-facing entry point remains `pr-review-comments-workflow`.
+Acquire PR review context and real identifiers for `pr-review-comments-workflow` from orchestrator-sourced github-context-agent reads. Internal skill: user-facing entry point remains `pr-review-comments-workflow`.
 
 ## Scope
 
-- Receive orchestrator-sourced GitHub context from github-context-agent: active PR identity, repository, head/base branch, PR head SHA, review comments, thread state, and real IDs required for reply or resolution sub-actions.
-- Produce a fresh unresolved/reopened snapshot before `review-cycle-gatekeeper` and before reply/resolve actions by requesting fresh github-context-agent reads via the orchestrator.
-- Block only the affected sub-action when an ID needed for that sub-action is missing from the orchestrator-sourced context.
-- Do not infer IDs from paths, line numbers, arbitrary URLs, user-provided fragments, stale cache, search snippets, placeholders, guesses, or prior partial reads. The only URL-derived exception is the narrow `html_url` `#discussion_r<digits>` fallback described under ID Mapping, and only for direct existing-comment replies.
+- Receive orchestrator-sourced GitHub context from github-context-agent: active PR identity, repository, head/base branch, PR head SHA, review comments, thread state, real IDs required for reply or resolution sub-actions.
+- Produce fresh unresolved/reopened snapshot before `review-cycle-gatekeeper` and before reply/resolve actions by requesting fresh github-context-agent reads via orchestrator.
+- Block only affected sub-action when ID needed for that sub-action missing from orchestrator-sourced context.
+- Do not infer IDs from paths, line numbers, arbitrary URLs, user-provided fragments, stale cache, search snippets, placeholders, guesses, or prior partial reads. Only URL-derived exception is narrow `html_url` `#discussion_r<digits>` fallback described under ID Mapping, only for direct existing-comment replies.
 
 ## Approved Read Paths
 
@@ -49,8 +49,8 @@ Return:
 
 ## Hard Stops
 
-- If a required real critical identifier is unavailable, block only the affected reply or resolve sub-action and report the missing field.
-- If the fresh unresolved/reopened snapshot cannot be produced, gatekeeper input is unknown; pass a blocker to `pr-review-round-closure` rather than reusing stale data.
-- If github-context-agent-owned reads do not provide the needed `reviewThreads` or nested `comments` IDs, or pagination/read completeness cannot be proven, mark the affected reply/resolve sub-action or gatekeeper snapshot incomplete/blocked and do not present it as fresh or gatekeeper-ready. Do not recover missing IDs through generic GraphQL CLI/API or execute-capable paths.
-- If only an arbitrary URL, file path, line number, user-provided fragment, guessed value, placeholder, dummy ID, search snippet, stale cache, or prior partial read is available, treat the ID as missing. The only URL-derived exception is the exact fresh-read `html_url` `#discussion_r<digits>` fallback for direct existing-comment reply `commentId`, under the provenance and fail-closed rules above.
-- GitHub repository file mutation tools remain denied and are never a context fallback.
+- If required real critical identifier unavailable, block only affected reply or resolve sub-action and report missing field.
+- If fresh unresolved/reopened snapshot cannot be produced, gatekeeper input unknown; pass blocker to `pr-review-round-closure` rather than reusing stale data.
+- If github-context-agent-owned reads do not provide needed `reviewThreads` or nested `comments` IDs, or pagination/read completeness cannot be proven, mark affected reply/resolve sub-action or gatekeeper snapshot incomplete/blocked and do not present as fresh or gatekeeper-ready. Do not recover missing IDs through generic GraphQL CLI/API or execute-capable paths.
+- If only arbitrary URL, file path, line number, user-provided fragment, guessed value, placeholder, dummy ID, search snippet, stale cache, or prior partial read available, treat ID as missing. Only URL-derived exception is exact fresh-read `html_url` `#discussion_r<digits>` fallback for direct existing-comment reply `commentId`, under provenance and fail-closed rules above.
+- GitHub repository file mutation tools remain denied and are never context fallback.

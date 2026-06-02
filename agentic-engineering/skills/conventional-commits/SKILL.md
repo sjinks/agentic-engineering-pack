@@ -7,39 +7,39 @@ user-invocable: true
 
 # Conventional Commits
 
-Use this skill to generate, review, or apply commit messages that follow the Conventional Commits 1.0.0 format. The goal is a clear, atomic message that describes the user-visible or maintenance impact of the change without overstating the scope. Use `commit-body-guidelines` for the required structured body.
+Generate, review, or apply commit messages following Conventional Commits 1.0.0 format. Use `commit-body-guidelines` for the required structured body.
 
 ## When to Use
 
-- **Generate a commit message** for pending or recent changes.
-- **Revise an existing message** to follow Conventional Commits.
-- **Validate a commit message** against type, scope, breaking-change, and footer rules.
-- **Generate or validate a Pull Request title** in Conventional Commit subject style (subject line only; no body or footers).
-- **Pair the summary with a required body** using `commit-body-guidelines`.
-- **Prepare release-friendly history** by aligning messages with semantic versioning expectations.
-- **Prepare commit execution** when a workflow or user explicitly asks to commit, while leaving local git execution to the appropriate edit/execute-capable specialist after safety gates pass.
+- Generate commit message for pending or recent changes.
+- Revise existing message to follow Conventional Commits.
+- Validate message against type, scope, breaking-change, and footer rules.
+- Generate or validate Pull Request title in Conventional Commit subject style (subject only; no body/footers).
+- Pair summary with required body using `commit-body-guidelines`.
+- Prepare release-friendly history aligning messages with semantic versioning.
+- Prepare commit execution when workflow/user explicitly asks to commit, while leaving local git execution to appropriate edit/execute-capable specialist after safety gates pass.
 
 ## Safety Rules
 
-- **Inspect before writing.** Review the requested change before proposing a message.
-- **Do not create commits unless requested or approved.** Generating a message is safe; modifying git history is not automatic.
-- **Apply workflow-safety-gates before executable commit guidance.** Before creating, amending, applying, or recommending executable commit commands, apply `workflow-safety-gates` and confirm the real target workspace/repo, current branch, default/base branch, upstream/remote, dirty/staged/unstaged scope, pushed/shared status, and exact target range/branch/SHA/path where relevant.
-- **Confirm real commit scope before applying.** Creating or applying commits requires real staged/unstaged scope confirmation; do not put placeholder commit SHAs/ranges or issue IDs in commit messages or footers. If scope, repository, branch, upstream, pushed/shared status, target path, or references are uncertain, draft the message only and report the blocker.
-- **Use local git execution only through an authorized specialist.** Commit creation, amend, or history rewrite must be done through local git execution by the appropriate edit/execute-capable specialist under workflow/user authorization. The orchestrator must not create commits directly.
-- **Stop when local execution is unavailable.** If authorized local execution/delegation is unavailable, stop and report blocked, or draft the message only.
-- **No GitHub file mutation substitutes.** Do not use `mcp_github_create_or_update_file`, `mcp_github_push_files`, or `mcp_github_delete_file` as commit, amend, branch-preparation, push, or recovery substitutes.
-- **Preserve unrelated user work.** If the working tree contains unrelated changes, call that out and keep the message scoped to the requested changes.
-- **Prefer one logical change per commit.** If the diff contains unrelated work, suggest splitting it into multiple commits.
-- **Avoid claiming verification that was not run.** Mention tests only when the diff or user request makes them relevant, and only report actual results.
-- **Commit subject and body reach git via `-F <message-file>` only.** Even a single-line conventional subject must not be passed through `git commit -m "..."` or any shell-interpolated argv; a stray `` ` ``, `$`, or `\` in the subject would be evaluated by the shell before git received it. See `workflow-safety-gates` "Shell-Safe Local Execution" for the canonical rule and `commit-body-guidelines` for the file-based execution procedure.
-- **Subjects and PR titles are externally-posted content.** Commit subjects appear in `git log`, GitHub UI, release notes, and blame; PR titles appear in the GitHub UI and search. Both surfaces are explicitly Covered by `workflow-safety-gates` Externally-Posted Content Gate. Do not include MCP tool names (`mcp_github_*`, `mcp_linear_*`, `mcp_obsidian_*`, `pull_request_read`, `resolve_thread`, etc.), MCP/host/plumbing state diagnostics, self-referential workflow language ("the skill", "the orchestrator", "handoff log"), workflow status diagnostics ("PR template status", "gatekeeper pass", "freshness refresh"), sentinel strings, or operator-side instructions in subjects or titles. Anti-example (forbidden): `chore(github-mcp): wire mcp_github_pull_request_review_write resolve_thread`. Acceptable replacement that describes the change in reviewer-facing English: `chore(workflow): document approved PR review write tools in the allowlist`.
+- **Inspect before writing.** Review requested change before proposing message.
+- **Do not create commits unless requested or approved.** Generating message is safe; modifying git history is not automatic.
+- **Apply workflow-safety-gates before executable commit guidance.** Before creating/amending/applying/recommending executable commit commands, apply `workflow-safety-gates` and confirm real target workspace/repo, current branch, default/base branch, upstream/remote, dirty/staged/unstaged scope, pushed/shared status, exact target range/branch/SHA/path.
+- **Confirm real commit scope before applying.** Creating/applying commits requires real staged/unstaged scope confirmation; no placeholder commit SHAs/ranges or issue IDs. If uncertain, draft message only and report blocker.
+- **Use local git execution only through authorized specialist.** Commit creation/amend/history rewrite via local git by appropriate edit/execute-capable specialist under workflow/user authorization. Orchestrator must not create commits directly.
+- **Stop when local execution unavailable.** If unavailable, stop and report blocked, or draft message only.
+- **No GitHub file mutation substitutes.** Do not use `mcp_github_create_or_update_file`, `mcp_github_push_files`, `mcp_github_delete_file` as commit/amend/branch-prep/push/recovery substitutes.
+- **Preserve unrelated user work.** If working tree contains unrelated changes, call that out and keep message scoped.
+- **Prefer one logical change per commit.** If diff contains unrelated work, suggest splitting.
+- **Avoid claiming verification not run.** Mention tests only when diff/request makes them relevant, report actual results only.
+- **Commit subject and body reach git via `-F <message-file>` only.** Even single-line conventional subject must not pass through `git commit -m "..."` or shell-interpolated argv. See `workflow-safety-gates` "Shell-Safe Local Execution" and `commit-body-guidelines`.
+- **Subjects and PR titles are externally-posted content.** Covered by `workflow-safety-gates` Externally-Posted Content Gate. Do not include MCP tool names, MCP/host/plumbing state diagnostics, self-referential workflow language, workflow status diagnostics, sentinel strings, or operator-side instructions. Anti-example (forbidden): `chore(github-mcp): wire mcp_github_pull_request_review_write resolve_thread`. Acceptable: `chore(workflow): document approved PR review write tools in the allowlist`.
 
 ## Workflow
 
-1. **Inspect the change.** Review the requested change source before writing the message.
-2. **Classify the change.** Identify the primary intent, affected scope, breaking-change status, and issue references.
-3. **Compose the message.** Use the smallest accurate type and optional scope, then add the required structured body with `commit-body-guidelines`.
-4. **Apply only when requested and gated.** Confirm the intended commit content first, apply `workflow-safety-gates`, and use the command guidance in `commit-body-guidelines` only when authorized local execution/delegation is available.
+1. Inspect requested change source.
+2. Classify: primary intent, affected scope, breaking-change status, issue references.
+3. Compose message: smallest accurate type and optional scope, then add required structured body with `commit-body-guidelines`.
+4. Apply only when requested and gated: confirm intended commit content, apply `workflow-safety-gates`, use command guidance in `commit-body-guidelines` only when authorized local execution/delegation available.
 
 ## Message Format
 
@@ -51,27 +51,27 @@ required body
 footer trailers when relevant
 ```
 
-The subject line uses a lowercase type and optional lowercase scope. The **type** is required (e.g., `feat`, `fix`, `docs`). The **scope** names the affected area when useful (e.g., `auth`, `search`). The **`!`** signals a breaking change. The **body** is required in this repository per `commit-body-guidelines` and should explain purpose, key changes, and impact. **Footers** are trailers for breaking changes, issue closure, or co-authors.
+The subject uses lowercase type and optional lowercase scope. **Type** required (e.g., `feat`, `fix`, `docs`). **Scope** names affected area when useful (e.g., `auth`, `search`). **`!`** signals breaking change. **Body** required per `commit-body-guidelines`; explains purpose, key changes, impact. **Footers** are trailers for breaking changes, issue closure, co-authors.
 
 ## Commit Types
 
 | Type | Use For |
 | --- | --- |
-| `feat` | A new feature or user-visible capability. |
-| `fix` | A bug fix or corrected behavior. |
-| `docs` | Documentation-only changes. |
-| `style` | Formatting or whitespace changes that do not affect behavior. |
-| `refactor` | Code changes that neither fix a bug nor add a feature. |
+| `feat` | New feature or user-visible capability. |
+| `fix` | Bug fix or corrected behavior. |
+| `docs` | Documentation-only. |
+| `style` | Formatting/whitespace, no behavior change. |
+| `refactor` | Code changes, no bug fix or feature. |
 | `perf` | Performance improvements. |
-| `test` | Adding, updating, or fixing tests. |
-| `build` | Build system, packaging, or dependency changes. |
-| `ci` | CI workflow or automation changes. |
-| `chore` | Maintenance work that does not modify source or test behavior. |
-| `revert` | Reverting a previous commit. |
+| `test` | Adding/updating/fixing tests. |
+| `build` | Build system/packaging/dependencies. |
+| `ci` | CI workflow/automation. |
+| `chore` | Maintenance, no source/test behavior change. |
+| `revert` | Reverting previous commit. |
 
 ## Message Rules
 
-- **Subject:** maximum about 72 characters; imperative mood; present tense; no trailing period.
+- **Subject:** maximum 72 characters; imperative mood; present tense; no trailing period.
 - **Scope:** optional and lowercase; use a concise module, package, directory, or feature name.
 - **Breaking changes:** add `!` after type or scope, and include a `BREAKING CHANGE:` footer.
 - **Body:** required; use `commit-body-guidelines` to explain purpose, key changes, impact, and validation; wrap around 72 characters.
@@ -80,7 +80,29 @@ The subject line uses a lowercase type and optional lowercase scope. The **type*
 
 ## Validation
 
-When asked to validate a commit message or PR title, apply this checklist deterministically and report each failed check by name:
+When asked to validate a commit message or PR title, apply this checklist deterministically and report each failed check by name. Run structural checks (type, scope shape, separator, length, regex) first, then semantic/audience checks (mood, casing, externally-posted content, footer/body audit); report failed nested checks by sub-check ID when a check names subcomponents (for example `5.imperative`, `5.casing`); otherwise use the top-level check ID.
+
+Composition rules for message structure (type list, scope format, subject structure, required body) are defined earlier in Safety/Message Format/Message Rules/PR Title Use sections. This validation section provides the 11-point checklist as the canonical pass/fail surface after drafting.
+
+**Applicability/Sequence Table (navigation aid only):**
+
+This table shows which parts of the message each check applies to. The numbered 11-point checklist below remains the authoritative validation surface.
+
+| Check | Commit Subject | PR Title | Body/Footer |
+| --- | --- | --- | --- |
+| 1. Type | ✓ | ✓ | — |
+| 2. Scope shape | ✓ | ✓ | — |
+| 3. Breaking marker | ✓ | ✓ | — |
+| 4. Separator | ✓ | ✓ | — |
+| 5. Description | ✓ | ✓ | — |
+| 6. Length | ✓ | ✓ | — |
+| 7. Externally-posted content audit | ✓ | ✓ | — |
+| 8. Anchored regex | ✓ | ✓ | — |
+| 9. Footer and body content audit | — | — | ✓ (when present) |
+| 10. PR-title-only checks | — | ✓ | — |
+| 11. Description character-class audit | ✓ | ✓ | ✓ (when present) |
+
+**Validation checklist:**
 
 1. **Type:** the message begins with a type from the canonical Commit Types table above (`feat | fix | docs | style | refactor | perf | test | build | ci | chore | revert`). Lowercase. No other types are accepted in this pack.
 2. **Scope shape (when present):** matches `\(([a-z0-9][a-z0-9-]*)\)` — lowercase alphanumeric with optional hyphens; no spaces, no slashes, no underscores.
@@ -90,15 +112,17 @@ When asked to validate a commit message or PR title, apply this checklist determ
 6. **Length:** the entire subject line is ≤ 72 characters including type, optional scope, optional `!`, `: `, and description; warn at > 50 characters.
 7. **Externally-posted content audit:** the subject contains no MCP tool names, no skill/agent names, no sentinel strings, no workflow-status diagnostics, no self-referential workflow language, per the rule in Safety Rules above.
 8. **Anchored regex (machine check):** `^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9][a-z0-9-]*\))?!?: \S.*\S$` matches the subject (anchored at start and end; description must start and end with non-whitespace; multi-line input fails because `.` does not match newlines). The regex alone does not enforce checks 5, 6, 7, 9, or 10; report those as separate items.
-9. **Footer and body content audit (when a body or footer is present).** Any commit body, any `BREAKING CHANGE:` footer, and any other footer trailer (`Closes #...`, `Refs ...`, `Co-authored-by:`, etc.) MUST satisfy the `workflow-safety-gates` Externally-Posted Content Gate — commit bodies are explicitly Covered Surfaces, and `BREAKING CHANGE:` footers are extracted verbatim into GitHub release notes and downstream changelog tooling (`conventional-changelog`, `semantic-release`, `release-please`). Audit the body and every footer for MCP tool names, skill/agent names, sentinel strings, workflow-status diagnostics, and self-referential workflow language. Apply the commit-body-specific forbidden list from `commit-body-guidelines` (no secrets, tokens, customer PII, internal hostnames, full log dumps, full file contents).
-10. **PR-title-only checks (when validating a PR title).** Apply in addition to checks 1–9: (a) the title field contains a single line — no embedded newlines, no body, no footers; (b) the type and scope describe the PR as a whole, not a single commit (when the PR contains multiple commits with different types, the title type is the dominant `feat`/`fix`/etc.); (c) issue keys appear in the title only when repository convention requires it, otherwise in the PR body. Skip check 10 for commit-subject validation; apply it for PR-title validation.
-11. **Description character-class audit.** The description (text after `: `) MUST NOT contain: leading or trailing whitespace; control characters (U+0000–U+001F, U+007F); bidirectional override codepoints (U+202A–U+202E, U+2066–U+2069); zero-width characters (U+200B–U+200D, U+FEFF); ASCII tab characters in the middle of the description. These can spoof rendered output on externally-posted surfaces (`git log`, GitHub UI, release notes, blame).
+9. **Footer and body content audit (when a body or footer is present, including externally-posted body/footer/trailer text where relevant).** Any commit body, any `BREAKING CHANGE:` footer, and any other footer trailer (`Closes #...`, `Refs ...`, `Co-authored-by:`, etc.) MUST satisfy the `workflow-safety-gates` Externally-Posted Content Gate — commit bodies are explicitly Covered Surfaces, and `BREAKING CHANGE:` footers are extracted verbatim into GitHub release notes and downstream changelog tooling (`conventional-changelog`, `semantic-release`, `release-please`). Audit the body and every footer for MCP tool names, skill/agent names, sentinel strings, workflow-status diagnostics, and self-referential workflow language. Apply the commit-body-specific forbidden list from `commit-body-guidelines` (no secrets, tokens, customer PII, internal hostnames, full log dumps, full file contents).
+10. **PR-title-only checks (when validating a PR title; skip for commit-subject validation).** Apply in addition to checks 1–9: (a) the title field contains a single line — no embedded newlines, no body, no footers; (b) the type and scope describe the PR as a whole, not a single commit (when the PR contains multiple commits with different types, the title type is the dominant `feat`/`fix`/etc.); (c) issue keys appear in the title only when repository convention requires it, otherwise in the PR body. This check applies only to PR-title validation, not commit-subject validation.
+11. **Description character-class audit (including externally-posted body/footer/trailer text where relevant).** The description (text after `: `) MUST NOT contain: leading or trailing whitespace; control characters (U+0000–U+001F, U+007F); bidirectional override codepoints (U+202A–U+202E, U+2066–U+2069, for example U+202E right-to-left override can reverse rendered subject appearance); zero-width characters (U+200B zero-width space, U+200C, U+200D, U+FEFF zero-width no-break space, can hide content or enable homoglyph spoofing); ASCII tab characters in the middle of the description. These can spoof rendered output on externally-posted surfaces (`git log`, GitHub UI, release notes, blame).
 
-Report validation results in the form `Validation: pass` or `Validation: fail (checks N, M, ...)` so downstream `## Output Format` consumers can audit which check failed. When a check has sub-rules (for example check 5's imperative-mood / first-character-casing / no-trailing-period rules), report at sub-check granularity in the form `fail (check 5.imperative, check 5.casing)`.
+**Nested sub-check reporting rule:** When a check has sub-rules, report at sub-check granularity using the form `fail (check N.sub-id)`. For example, check 5 (Description) has imperative-mood, first-character-casing, and no-trailing-period sub-rules; report failures as `fail (check 5.imperative, check 5.casing)` rather than `fail (check 5)`. For checks without named sub-rules, report the top-level check ID.
+
+Report validation results in the form `Validation: pass` or `Validation: fail (checks N, M, ...)` so downstream `## Output Format` consumers can audit which check failed.
 
 ## PR Title Use
 
-PR titles use only the Conventional Commit subject line — the same `type(scope)!: description` form as a commit subject, with the same length, mood, and casing rules. The structured body, footers, and `BREAKING CHANGE:` trailer do NOT apply to a PR title; those live in the PR body (composed by `pull-request-description` and the PR Template Gate) and in the commits themselves.
+PR titles adapt Conventional Commit subject format with modifications. The title follows the same `type(scope)!: description` structure, length, mood, and casing rules as a commit subject, but the type and scope describe the PR as a whole, not a single commit. The structured body, footers, and `BREAKING CHANGE:` trailer do NOT apply to a PR title; those live in the PR body (composed by `pull-request-description` and the PR Template Gate) and in the commits themselves. This skill returns the title only; no body or footer content appears in the title field.
 
 Rules specific to PR titles:
 
