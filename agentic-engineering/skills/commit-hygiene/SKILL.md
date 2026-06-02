@@ -61,7 +61,8 @@ Before making any history cleanup, inspect and report on:
      - Record the result as `local-only` (no remote ref contains it) or `pushed (remotes: <list>)` with the list of remote names.
    - Record commit hashes, messages, authors, and the local-only/pushed classification.
    - Identify the number of commits before cleanup.
- a. **Classify commits.**
+
+3. **Classify commits.**
    - **Keep:** Real work commits with clear purpose and atomic changes.
    - **Fixup:** Commits that fix typos, formatting, or minor issues in prior commits (use `git rebase -i` with `fixup`).
    - **Squash:** Commits that are part of the same logical change and should be combined (use `git rebase -i` with `squash`).
@@ -69,12 +70,10 @@ Before making any history cleanup, inspect and report on:
    - **Remove/discard:** Accidental no-op, debug, temporary, or unintended commits. Use `git rebase -i` with `drop` (preferred when there are intervening commits). Do not use `git reset --soft` here — `--soft` un-commits but preserves the change in the index, which can silently reintroduce the discarded content into the next commit. If the unwanted commit is the most recent and the working tree was clean before it, `git reset --mixed HEAD~1` followed by an explicit `git restore <paths>` is acceptable with the same Pre-Rewrite Checks as a rebase drop. `git reset --hard` remains disallowed for cleanup (use the pre-rewrite backup ref to recover instead).
    - **Needs user decision:** Unclear commits requiring user guidance before proceeding.
 
-3b. **Record rationale.**
-   - For each classification decision, record the reason: commit is real work (keep), fixes prior commit (fixup), belongs to same logical change (squash), contains unrelated work (split), is accidental/no-op/debug (drop), or needs user input (needs user decision)t rebase -i` with `edit`).
-   - **Remove/discard:** Accidental no-op, debug, temporary, or unintended commits. Use `git rebase -i` with `drop` (preferred when there are intervening commits). Do not use `git reset --soft` here — `--soft` un-commits but preserves the change in the index, which can silently reintroduce the discarded content into the next commit. If the unwanted commit is the most recent and the working tree was clean before it, `git reset --mixed HEAD~1` followed by an explicit `git restore <paths>` is acceptable with the same Pre-Rewrite Checks as a rebase drop. `git reset --hard` remains disallowed for cleanup (use the pre-rewrite backup ref to recover instead).
-   - **Needs user decision:** Unclear commits requiring user guidance before proceeding.
+4. **Record rationale.**
+   - For each classification decision, record the reason: commit is real work (keep), fixes prior commit (fixup), belongs to same logical change (squash), contains unrelated work (split), is accidental/no-op/debug (drop), or needs user input (needs user decision).
 
-4. **Make history atomic and meaningful using safe local history cleanup.**
+5. **Make history atomic and meaningful using safe local history cleanup.**
    - Use `git rebase -i <base-branch>` for interactive rebasing.
    - Apply fixup, squash, split, reorder, or drop operations as classified.
    - Ensure each commit represents one logical change.
@@ -82,12 +81,12 @@ Before making any history cleanup, inspect and report on:
    - Verify commit messages are clear, include issue keys when relevant, and follow repository conventions.
    - After rebase, test and verify that the changes still work correctly.
 
-5. **Verify working tree and tests after cleanup.**
+6. **Verify working tree and tests after cleanup.**
    - Run `git status` to confirm working tree is clean or expected state.
    - Run tests, linting, or build commands as appropriate for the repository.
    - Verify that all intended changes are present and accidental changes have been removed.
 
-6. **Summarize final commit stack before push/PR.**
+7. **Summarize final commit stack before push/PR.**
    - Report the number of commits after cleanup.
    - List final commits with hashes, messages, and authors.
    - Report the total diff (files changed, insertions, deletions).
