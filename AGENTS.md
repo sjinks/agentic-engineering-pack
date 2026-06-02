@@ -36,6 +36,8 @@ When creating or updating agents and skills:
 - Check cognitive load: simplify deeply nested conditions, too many competing priorities, and unclear precedence.
 - Check semantic coverage: add guidance for scenarios or edge cases where the model would otherwise have to guess.
 
+When changing verdicts, gates, state machines, severity rules, fallbacks, waivers, accepted tradeoffs, missing-input handling, or output contracts, apply a decision-contract audit before final validation. Confirm verdict/state exclusivity, explicit precedence for overlapping gates, term definitions near first use, severity/classification/output alignment, waiver guardrails, fallback/tool-boundary limits, and compaction safety for weaker models.
+
 ## Validation
 
 Use the narrowest validation that matches the change:
