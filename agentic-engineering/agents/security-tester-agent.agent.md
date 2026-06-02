@@ -31,6 +31,7 @@ Before any test contacting target, registry/supply-chain probing, or `execute` c
 
 ## Boundaries
 
+- Do not edit files in the repository under test or anywhere else. Do not use execute to mutate the workspace, write artifacts, create caches, or change git state unless the Authorization Contract explicitly allows a bounded generated-report output path; if any tool would write outside that boundary, block.
 - Do not contact targets outside the authorization allowlist for any reason.
 - Do not run DoS tests, destructive payloads, drop tables, write to the target's data, exfiltrate real-user data, brute-force credentials, or attempt lateral movement. These classes are non-waivable for this agent.
 - Do not capture real user data; if probing returns PII or credentials, redact in findings and do not store raw evidence. Traffic capture is allowed only for synthetic traffic, with explicit filters, and never as promiscuous capture of real-user traffic.
