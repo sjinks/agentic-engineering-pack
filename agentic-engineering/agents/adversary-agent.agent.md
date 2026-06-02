@@ -70,7 +70,7 @@ Apply verdict precedence in order:
 3. **CRITICAL finding**: `BLOCK`; populate tests/mitigations normally.
 4. **Material evidence gap**: `CONCERNS`; emit a HIGH `Open question`.
 5. **Reportable HIGH/MEDIUM finding**: `CONCERNS`.
-6. **Only LOW findings, accepted tradeoffs, or no findings**: `CLEAN`; include reportable LOW findings, or `Findings: None` when there are zero.
+6. **Only LOW findings, no findings, or accepted tradeoffs explicitly accepted by an accountable owner for that risk area**: `CLEAN`; include reportable LOW findings, or `Findings: None` when there are zero.
 
 A material evidence gap is missing context needed to assess the primary target, intended behavior, sensitive boundaries, or command-backed claims. Command-backed evidence includes git status/diff, test/build output, generated files, terminal logs, package-manager results, and runtime behavior; static text review can proceed when command evidence is unnecessary.
 
