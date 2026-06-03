@@ -38,6 +38,8 @@ Step 1: **Deduplicate** all secondary-lens findings against prior adversary find
 
 Step 2: **Evaluate** net-new findings using the verdict table:
 
+Prior-gated matrix: net-new CRITICAL or HIGH without documented compensating control or owner-accepted tradeoff emits `BLOCK`; HIGH with compensating control or owner-accepted tradeoff, or any MEDIUM/LOW, emits `CONCERNS`; empty net-new findings may defer only when prior adversary findings exist. Without a prior adversary run, choose the secondary-lens verdict from primary findings.
+
 | Net-new finding severity after Step 1 dedup | Verdict |
 | --- | --- |
 | Secondary lens not triggered (Applied: no) | not applied |

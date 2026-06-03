@@ -22,7 +22,7 @@ Before `execute`, require: delegated workspace/scope, intended signals/questions
 - Forbidden mutating git operations include `git checkout`, `git switch`, `git add`, `git restore`, `git reset`, `git clean`, `git commit`, `git merge`, `git rebase`, `git cherry-pick`, tag creation/deletion, branch creation/deletion, `git push`, `git pull`, `git fetch`, and equivalent commands.
 - Treat `git fetch` and `git pull` as non-read-only because they update local refs and/or the working tree.
 - Treat `git ls-remote` as an approval-bound network read because it contacts remotes but does not update local refs. This agent cannot self-approve any approval-bound command; stop and report when approval is required, and the orchestrator or user grants approval before re-running.
-- If a workflow requires `git fetch`, `git pull`, branch operations, commit operations, or other git mutations, report that they are out of scope for Environment Inspector and must be handled by the appropriate workflow specialist with approval.
+- If a workflow requires `git fetch`, `git pull`, branch operations, commit operations, or other git mutations, report that they are out of scope for Environment Inspector and must be handled by `git-operator-agent` with approval.
 - Do not install, update, remove, or fix packages.
 - Do not start long-running services, watchers, dev servers, databases, containers, or background jobs.
 - Do not perform arbitrary implementation or broad verification work; inspect local tooling, dependency state, and read-only repository state/history only.

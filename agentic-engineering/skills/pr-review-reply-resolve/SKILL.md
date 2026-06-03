@@ -19,7 +19,7 @@ Reply to PR review threads and resolve them only after pushed-visible fixes and 
 
 ## Reply Before Resolve
 
-- For every addressed thread whose cited file or region touched by pushed fix commits, post per-thread evidence reply before resolving.
+- For every addressed thread whose cited file or region touched by pushed fix commits, post a per-thread evidence reply before resolving.
 - Reply names relevant fix commit SHA as plain text and gives one-line summary of what changed.
 - For every fix-backed reply, include relevant pushed-visible fix commit SHA as plain text plus reviewer-relevant summary and test evidence when applicable.
 - For verified no-change, disagreement, clarification replies that are not fix-backed and do not correspond to touched cited files/regions, cite evidence/provenance for decision and do not require or invent fix commit SHA.
@@ -68,9 +68,9 @@ Return:
 
 ---
 
-## Pending Review Lifecycle (Not Currently Available - Documented for Future Restoration)
+## Pending Review Lifecycle (Inactive Future Reference)
 
-Pending-review inline comments (`mcp_github_add_pull_request_review_comment_to_pending_review`) are not currently granted to any agent in this pack. The lifecycle below documents the design but is not an active workflow path. If pending-review inline support is restored in the future, the following rules apply:
+Pending-review inline comments are outside the active reply surface. The lifecycle below documents the design but is not an active workflow path. If pending-review inline support is restored in the future, the following rules apply:
 
 Pending-review inline comments are staged draft content, not GitHub-visible posted evidence. Treat them as posted per-thread evidence only after submit-pending-review succeeds and the submitted review/comment visibility is confirmed from the tool result or a fresh read. Staging a pending inline comment, receiving a pending comment ID, or composing a top-level review body is not enough to resolve the thread.
 
