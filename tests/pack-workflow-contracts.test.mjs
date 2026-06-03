@@ -1164,6 +1164,60 @@ test('fixture generator allows clean output under dist generated root', async ()
     }
 });
 
+test('fixture generator resolves default and relative outputs from repo root when run in a subdirectory', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'agentic-engineering-subdir-out-'));
+
+    try {
+        const { fixtureRepo, fixtureScript } = await createGeneratorFixture(tempRoot);
+        const invocationDir = pathWithin(fixtureRepo, 'nested/invocation');
+        await mkdir(invocationDir, { recursive: true });
+
+        const defaultOutputRoot = pathWithin(fixtureRepo, 'dist/agentic-engineering-pack');
+        await execFileAsync(process.execPath, [
+            fixtureScript,
+            '--clean',
+        ], { cwd: invocationDir });
+
+        assert.equal(await exists(pathWithin(defaultOutputRoot, 'README.md')), true, 'default output lands under repo-root dist');
+        assert.equal(await exists(pathWithin(invocationDir, 'dist/agentic-engineering-pack')), false, 'default output does not land under invocation cwd');
+
+        const splitRelativeOutputRoot = pathWithin(fixtureRepo, 'dist/split-relative-pack');
+        await execFileAsync(process.execPath, [
+            fixtureScript,
+            '--out',
+            'dist/split-relative-pack',
+            '--clean',
+        ], { cwd: invocationDir });
+
+        assert.equal(await exists(pathWithin(splitRelativeOutputRoot, 'README.md')), true, '--out relative path lands under repo root');
+        assert.equal(await exists(pathWithin(invocationDir, 'dist/split-relative-pack')), false, '--out relative path does not land under invocation cwd');
+
+        const equalsRelativeOutputRoot = pathWithin(fixtureRepo, 'dist/equals-relative-pack');
+        await execFileAsync(process.execPath, [
+            fixtureScript,
+            '--out=dist/equals-relative-pack',
+            '--clean',
+        ], { cwd: invocationDir });
+
+        assert.equal(await exists(pathWithin(equalsRelativeOutputRoot, 'README.md')), true, '--out= relative path lands under repo root');
+        assert.equal(await exists(pathWithin(invocationDir, 'dist/equals-relative-pack')), false, '--out= relative path does not land under invocation cwd');
+
+        const absoluteOutputRoot = join(tempRoot, 'absolute-output-pack');
+        await execFileAsync(process.execPath, [
+            fixtureScript,
+            '--out',
+            absoluteOutputRoot,
+            '--clean',
+        ], { cwd: invocationDir });
+
+        assert.equal(await exists(pathWithin(absoluteOutputRoot, 'README.md')), true, 'absolute output path still works from subdirectory cwd');
+        assert.equal(await exists(pathWithin(fixtureRepo, 'absolute-output-pack')), false, 'absolute output path is not re-rooted under repo root');
+    }
+    finally {
+        await rm(tempRoot, { recursive: true, force: true });
+    }
+});
+
 test('generator classifies broad output roots without touching them', () => {
     const filesystemRoot = parse(process.cwd()).root;
     const homeParent = dirname(homedir());

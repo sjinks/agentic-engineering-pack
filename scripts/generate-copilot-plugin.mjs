@@ -9,6 +9,10 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
 const defaultOut = path.join('dist', 'agentic-engineering-pack');
 
+function resolveOutputPath(value) {
+    return path.isAbsolute(value) ? path.resolve(value) : path.resolve(repoRoot, value);
+}
+
 function usage() {
     return `Generate an installable Copilot plugin bundle.
 
@@ -23,7 +27,7 @@ Options:
 }
 
 function parseArgs(argv) {
-    const options = { clean: false, out: path.resolve(process.cwd(), defaultOut) };
+    const options = { clean: false, out: resolveOutputPath(defaultOut) };
 
     for (let index = 0; index < argv.length; index += 1) {
         const arg = argv[index];
@@ -39,11 +43,11 @@ function parseArgs(argv) {
             if (!value || value.startsWith('--')) {
                 throw new Error('--out requires a path value.');
             }
-            options.out = path.resolve(process.cwd(), value);
+            options.out = resolveOutputPath(value);
             index += 1;
         }
         else if (arg.startsWith('--out=')) {
-            options.out = path.resolve(process.cwd(), arg.slice('--out='.length));
+            options.out = resolveOutputPath(arg.slice('--out='.length));
         }
         else {
             throw new Error(`Unknown argument: ${arg}`);
