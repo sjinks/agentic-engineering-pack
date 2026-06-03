@@ -295,7 +295,7 @@ Before delegating/performing branch ops/staging/committing/amending/rebasing/squ
 - Verbatim user-approval text when action requires explicit approval (force-push, history rewrite, broad staging, default-branch ops, branch deletion). Paraphrased/summarized insufficient.
 - Confirmation channel: if receiving specialist lacks `vscode/askQuestions`, orchestrator must capture/forward verbatim approval. Specialists refuse if paraphrased/missing/inconsistent.
 - Approval-tool fallback: if neither specialist nor orchestrator has `vscode/askQuestions` (host did not load), report blocked-on-approval; provide verbatim text operator must paste before mutation. No infer approval from prior turns. No force-push/history rewrite/broad staging/default-branch op/branch deletion until verbatim text received.
-- Execution form for commit/amend/rewrite/tag step: explicit confirmation message passed via `-F <message-file>` from file written by authorized file-write tool, not via `-m`, `--message`, shell substitution, or shell-built file synthesis. See "Shell-Safe Local Execution".
+- Execution form for commit/amend/rewrite commit-message steps: message content passed via `-F <message-file>` from file written by authorized file-write tool, not via `-m`, `--message`, shell substitution, or shell-built file synthesis. See "Shell-Safe Local Execution".
 - Metadata cleanup/exact local branch deletion inherits destructive cleanup exclusions from `git-operator-agent`; it does not authorize `git clean`, working-tree deletion, tag deletion, generic ref deletion, or broad pruning.
 
 Rules:
@@ -316,7 +316,7 @@ Commit messages and any other multi-line or special-character text passed to loc
 - Commit message subject AND body must be passed to git via `-F <message-file>` or `--file=<message-file>`, never via `-m "..."`, `-m '...'`, or any other argv form that interpolates the message through a shell.
 - The message file must be created by an authorized file-write tool (the host's edit tool). Do not synthesize the file via shell `echo`, `printf`, `cat <<EOF`, here-strings, here-docs, or output redirection — those mechanisms re-introduce the same interpolation hazard before the file is written.
 - Backticks, `$`, `${}`, `$()`, `\`, `!`, and other shell metacharacters in commit messages are content, not commands. They must be preserved verbatim.
-- The same rule applies to `git commit --amend` (use `--amend -F <message-file>` or open `$EDITOR` against a written file), `git tag -m` (use `-F`), `git notes add -m` (use `-F`), and any executor that takes message content.
+- The same rule applies to `git commit --amend` (use `--amend -F <message-file>` or open `$EDITOR` against a written file), `git tag -m` (use `-F`), `git notes add -m` (use `-F`), and any executor that takes message content. The `git tag -m` and `git notes add -m` examples are message-handling examples only; they do not authorize `git-operator-agent` to perform tag or notes operations, whose allowed command scope remains governed by the Local Git Mutation Delegation Contract and applicable agent boundaries.
 - For interactive rebase (`git rebase -i`), do not embed commit message text in the rebase script; use `git commit -F <file>` from the rebase's edit/reword step or from outside the rebase.
 - For `git rebase --exec "..."`, the `--exec` argument is itself shell-interpolated; do not place commit message text inside it.
 

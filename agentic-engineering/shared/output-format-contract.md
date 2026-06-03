@@ -204,7 +204,7 @@ Use this package when a canonical sentinel, operator advisory prompt, or rationa
 ## Mutation-Readiness Fields
 
 - Commit/push status
-  - Whether local changes are committed, pushed, and visible where required.
+  - Whether local changes are committed and whether push completion is required, completed, blocked, or not applicable. Report separately from remote-visible head branch, local push/ref evidence, and pushed-visible PR-diff visibility.
 - Remote-visible head branch status/provenance
   - Whether the intended remote owner/repo has the head branch with referenced commits reachable, plus the evidence source. Report separately from commit/push status and pushed-visible PR-diff visibility.
 - Local push/ref evidence status/provenance
