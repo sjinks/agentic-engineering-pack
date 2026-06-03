@@ -2199,7 +2199,7 @@ test('workflow-safety-gates defines Remote-visible head branch distinct from Pus
     const glossary = sliceBetween(workflowSafety, '## Glossary', '## Untrusted External Content', 'workflow-safety-gates Glossary section');
 
     assert.match(glossary, /\*\*Remote-visible head branch\*\*: The head branch exists in the intended remote owner\/repo with the referenced commits reachable/);
-    assert.match(glossary, /Evidence provenance names github-context-agent handoff and\/or approved local git inspection/);
+    assert.match(glossary, /Evidence provenance names `github-context-agent` handoff and\/or approved local git inspection\./);
     assert.match(glossary, /Required before PR creation when no PR exists/);
     assert.match(glossary, /distinct from \*\*Pushed-visible\*\*, which requires PR-diff reflection after a PR exists/);
 
@@ -2396,7 +2396,7 @@ test('pr-creation-agent forbids mutating-probe remote-visible discovery', async 
     );
     assert.match(
         approachSection,
-        /Do not call `mcp_github_create_pull_request` to discover remote-visible status from its error response/,
+        /Do not call `mcp_github_create_pull_request` to discover `Remote-visible head branch` status from its error response/,
         'pr-creation-agent step 2 must explicitly forbid the mutating-probe reading',
     );
     assert.match(
