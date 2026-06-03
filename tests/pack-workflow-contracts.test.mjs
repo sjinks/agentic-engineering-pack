@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { access, copyFile, link, lstat, mkdir, mkdtemp, readdir, readFile, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join, parse } from 'node:path';
+import { dirname, isAbsolute, join, parse, relative, resolve } from 'node:path';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
@@ -418,22 +418,89 @@ async function assertGeneratedGuideLinksResolve(outputRoot, targetPattern, descr
 
 async function assertGeneratedMarkdownLinksResolve(outputRoot, relativePath) {
     const markdown = await read(pathWithin(outputRoot, relativePath));
+    const outputRootPath = resolve(outputRoot);
+    const markdownDirectory = resolve(pathWithin(outputRootPath, dirname(relativePath)));
+    const isExternalUrlTarget = (targetPath) => targetPath.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(targetPath);
     const sourceLayoutTargets = markdownLinkTargets(markdown)
         .filter((target) => /(?:^|\/)\.github\/(?:agents|skills|prompts)\//.test(linkPathWithoutFragment(target)));
     assert.deepEqual(sourceLayoutTargets, [], `${relativePath} has no generated links to source .github customization paths`);
 
+    const absoluteMarkdownTargets = markdownLinkTargets(markdown)
+        .filter((target) => {
+            const targetPath = linkPathWithoutFragment(target);
+            return targetPath.endsWith('.md') && !isExternalUrlTarget(targetPath) && isAbsolute(targetPath);
+        });
+    assert.deepEqual(absoluteMarkdownTargets, [], `${relativePath} has no absolute generated markdown links`);
+
     const localMarkdownTargets = markdownLinkTargets(markdown)
         .filter((target) => {
             const targetPath = linkPathWithoutFragment(target);
-            return targetPath.endsWith('.md') && !targetPath.startsWith('#') && !/^[a-z][a-z0-9+.-]*:/i.test(targetPath);
+            return targetPath.endsWith('.md') && !targetPath.startsWith('#') && !isExternalUrlTarget(targetPath) && !isAbsolute(targetPath);
         });
 
     assert.ok(localMarkdownTargets.length > 0, `${relativePath} includes package-local markdown links`);
     for (const target of localMarkdownTargets) {
-        const linkedPath = join(pathWithin(outputRoot, dirname(relativePath)), linkPathWithoutFragment(target));
+        const linkedPath = resolve(markdownDirectory, linkPathWithoutFragment(target));
+        const linkedRelativePath = relative(outputRootPath, linkedPath);
+
+        assert.ok(
+            linkedRelativePath === '' || (!linkedRelativePath.startsWith('..') && !isAbsolute(linkedRelativePath)),
+            `${relativePath} package-local markdown link stays under output root: ${target}`,
+        );
         assert.equal(await exists(linkedPath), true, `${relativePath} package-local markdown link resolves: ${target}`);
     }
 }
+
+test('generated markdown link resolver rejects absolute and escaping local markdown targets', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'agentic-engineering-link-resolve-'));
+    const outputRoot = join(tempRoot, 'plugin');
+
+    try {
+        const absoluteTarget = join(tempRoot, 'outside.md');
+        const escapingTarget = join(tempRoot, 'escaped.md');
+        const generatedGuidePath = pathWithin(outputRoot, 'docs/README.md');
+
+        await mkdir(dirname(generatedGuidePath), { recursive: true });
+        await writeFile(absoluteTarget, '# outside\n', 'utf8');
+        await writeFile(escapingTarget, '# escaped\n', 'utf8');
+        await writeFile(pathWithin(outputRoot, 'README.md'), `[Absolute](${absoluteTarget})\n`, 'utf8');
+        await writeFile(generatedGuidePath, '[Escaping](../../escaped.md)\n', 'utf8');
+
+        await assert.rejects(
+            assertGeneratedMarkdownLinksResolve(outputRoot, 'README.md'),
+            /README\.md has no absolute generated markdown links/,
+        );
+        await assert.rejects(
+            assertGeneratedMarkdownLinksResolve(outputRoot, 'docs/README.md'),
+            /docs\/README\.md package-local markdown link stays under output root: \.\.\/\.\.\/escaped\.md/,
+        );
+    }
+    finally {
+        await rm(tempRoot, { recursive: true, force: true });
+    }
+});
+
+test('generated markdown link resolver ignores protocol-relative external markdown URLs', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'agentic-engineering-link-resolve-'));
+    const outputRoot = join(tempRoot, 'plugin');
+
+    try {
+        const localTargetPath = pathWithin(outputRoot, 'docs/local.md');
+
+        await mkdir(dirname(localTargetPath), { recursive: true });
+        await writeFile(localTargetPath, '# local\n', 'utf8');
+        await writeFile(
+            pathWithin(outputRoot, 'README.md'),
+            '[Local](docs/local.md)\n[External](//example.com/docs/file.md)\n',
+            'utf8',
+        );
+
+        await assertGeneratedMarkdownLinksResolve(outputRoot, 'README.md');
+    }
+    finally {
+        await rm(tempRoot, { recursive: true, force: true });
+    }
+});
 
 async function assertFixtureGeneratorRejectsDangerousOut(outArg) {
     const tempRoot = await mkdtemp(join(tmpdir(), 'agentic-engineering-dangerous-out-'));
