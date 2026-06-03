@@ -205,6 +205,10 @@ Use this package when a canonical sentinel, operator advisory prompt, or rationa
 
 - Commit/push status
   - Whether local changes are committed, pushed, and visible where required.
+- Remote-visible head branch status/provenance
+  - Whether the intended remote owner/repo has the head branch with referenced commits reachable, plus the evidence source. Report separately from commit/push status and pushed-visible PR-diff visibility.
+- Pushed-visible PR-diff visibility status/provenance
+  - Requires PR head SHA/commit reachability and GitHub PR-diff evidence that the relevant commits are reflected in the PR. Report separately from remote-visible head branch and local push/ref evidence.
 - Readiness summary
   - Clear statement whether workflow output is ready for the next stage.
 

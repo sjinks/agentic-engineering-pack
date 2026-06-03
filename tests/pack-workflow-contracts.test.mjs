@@ -441,12 +441,12 @@ test('agentic-engineering agent and skill pack surfaces resolve to source or rem
     }
 });
 
-test('Linear skill orders commit hygiene, push visibility, gatekeeper, then PR creation', async () => {
+test('Linear skill orders commit hygiene, push visibility, gatekeeper, then PR creation delegation', async () => {
     const text = await read(linearSkillPath);
-    const commitHygiene = text.indexOf('7. **Clean commit history with commit hygiene.**');
-    const push = text.indexOf('8. **Push to the PR branch via delegated local git mechanics.**');
-    const gatekeeper = text.indexOf('9. **Run the review closure gatekeeper.**');
-    const prCreation = text.indexOf('10. **Create a GitHub PR only after verification, history cleanup, push visibility, and gatekeeper closure.**');
+    const commitHygiene = text.indexOf('7. **Clean history with commit hygiene.**');
+    const push = text.indexOf('8. **Push via delegated local git.**');
+    const gatekeeper = text.indexOf('9. **Run review closure gatekeeper.**');
+    const prCreation = text.indexOf('10. **Delegate GitHub PR creation after verification/history/push/gatekeeper.**');
 
     assert.ok(commitHygiene >= 0, 'commit hygiene step is present');
     assert.ok(push > commitHygiene, 'push follows commit hygiene');
@@ -530,6 +530,11 @@ test('shared output format contract exists with reusable core fields', async () 
     assert.match(text, /Blockers/);
     assert.match(text, /Residual risks/);
     assert.match(text, /Follow-up/);
+    assert.match(text, /Remote-visible head branch status\/provenance/);
+    assert.match(text, /Report separately from commit\/push status and pushed-visible PR-diff visibility/);
+    assert.match(text, /Pushed-visible PR-diff visibility status\/provenance/);
+    assert.match(text, /Requires PR head SHA\/commit reachability and GitHub PR-diff evidence that the relevant commits are reflected in the PR/);
+    assert.match(text, /Report separately from remote-visible head branch and local push\/ref evidence/);
 });
 
 test('shared output format contract owns reusable validation and PR status packages', async () => {
@@ -1902,14 +1907,18 @@ test('workflow safety PR Body Audit Gate is canonical for all PR body paths', as
     const linear = await read(linearSkillPath);
     const prReview = await read(prReviewSkillPath);
     const composer = await read(pullRequestDescriptionPath);
+    const prBodyAudience = sliceBetween(workflowSafety, '### PR Body Audience', '### PR Body Audit Gate', 'workflow safety PR Body Audience section');
     const auditGate = sliceBetween(workflowSafety, '### PR Body Audit Gate', '## PR Readiness Evidence Gate', 'workflow safety PR Body Audit Gate section');
     const prReviewIntegration = sliceBetween(prReview, '## Integration with Pull Request Description', '\n## Output Format', 'PR review integration with pull request description section');
+
+    assert.match(prBodyAudience, /orchestrator-coordinated PR creation delegated to `pr-creation-agent`/);
+    assert.doesNotMatch(prBodyAudience, /orchestrator's inline PR-creation step/);
 
     assert.match(auditGate, /Before a workflow sends a body to `mcp_github_create_pull_request`/);
     assert.match(auditGate, /publishes a PR-ready body for manual creation/);
     assert.match(auditGate, /returns a final fenced copy\/paste PR description/);
-    assert.match(auditGate, /orchestrator's inline PR creation/);
-    assert.match(auditGate, /direct `linear-issue-workflow` PR creation/);
+    assert.match(auditGate, /orchestrator-coordinated PR creation paths/);
+    assert.match(auditGate, /the `linear-issue-workflow` delegated PR creation path/);
     assert.match(auditGate, /`pull-request-description`/);
     assert.match(auditGate, /workflow\/template leakage/);
     assert.match(auditGate, /Hard-wrapped paragraphs or list items/);
@@ -1921,7 +1930,7 @@ test('workflow safety PR Body Audit Gate is canonical for all PR body paths', as
     assert.match(orchestrator, /failed\/blocked PR Body Audit Gate/);
     assert.match(orchestrator, /`workflow-safety-gates` PR Template Gate, PR Body Audit Gate, PR Readiness Evidence Gate/);
     assert.match(linear, /apply the `workflow-safety-gates` PR Body Audit Gate to the complete candidate body/);
-    assert.match(linear, /before calling `mcp_github_create_pull_request` or publishing any PR-ready body/);
+    assert.match(linear, /before delegating PR creation to `pr-creation-agent` or publishing any PR-ready body/);
     assert.match(prReviewIntegration, /explicit PR description update requests and final PR-body refreshes as PR-body composition\/publication paths/);
     assert.match(prReviewIntegration, /Route through `pull-request-description` when available; otherwise apply the complete `workflow-safety-gates` PR Body Audit Gate checklist/);
     assert.match(prReviewIntegration, /before returning any final fenced copy\/paste PR body or PR-ready body/);
@@ -2083,12 +2092,28 @@ test('git-operator-agent owns local git mechanics', async () => {
     assert.match(frontmatter, /execute/m, 'git-operator-agent can run local git commands');
     assert.match(gitOperator, /Local Git Mutation Delegation Contract/);
     assert.match(gitOperator, /Shell-Safe Local Execution/);
-    assert.match(gitOperator, /pushed-visible confirmation/);
+    assert.match(gitOperator, /local push\/ref evidence/);
+    assert.match(gitOperator, /downstream pushed-visible confirmation/);
+    assert.match(gitOperator, /GitHub PR-diff visibility remains owned by github-context-agent\/orchestrator handoff/);
+    assert.match(gitOperator, /Cleanup means metadata-only cleanup/);
+    assert.match(gitOperator, /temporary message files created for the approved action/);
+    assert.match(gitOperator, /explicitly named local branches only when the delegation contract approves that exact branch deletion and required approval is present/);
+    assert.match(gitOperator, /Do not delete generic local refs, tags, notes/);
+    assert.match(gitOperator, /working-tree deletion and `git clean` are out of scope for this agent even with approval/);
+    assert.match(gitOperator, /`git clean` and working-tree deletion are out of scope for this agent/);
+    assert.match(gitOperator, /Pass commit and amend messages via `-F <message-file>`/);
+    assert.doesNotMatch(gitOperator, /explicitly named local refs, branches, or tags/);
+    assert.doesNotMatch(gitOperator, /branch deletion, tag deletion, `git clean`, and any command outside the exact approved scope/);
+    assert.doesNotMatch(gitOperator, /tag, and notes messages/);
+    assert.doesNotMatch(gitOperator, /remove generated artifacts unless the delegation contract/);
+    assert.doesNotMatch(gitOperator, /pushed-visible confirmation mechanics/);
 
     assert.match(orchestrator, /Local git mechanics belong to `git-operator-agent`/);
+    assert.match(orchestrator, /Final pushed-visible status comes from github-context-agent PR-diff visibility evidence after git-operator-agent local push\/ref evidence/);
     assert.match(builder, /If the change requires local git mutation, route that need to `git-operator-agent`/);
     assert.match(testAgent, /If local git mutation is needed, route that need to `git-operator-agent`/);
-    assert.match(prReviewFixCycle, /Delegate local branch, staging, commit, amend, cleanup, push, and pushed-visible confirmation mechanics to `git-operator-agent`/);
+    assert.match(prReviewFixCycle, /Delegate local branch, staging, commit, amend, cleanup, push, and local push\/ref evidence for downstream pushed-visible confirmation to `git-operator-agent`/);
+    assert.match(prReviewFixCycle, /separate GitHub PR-diff visibility status for pushed-visible confirmation/);
 });
 
 test('github-context-agent has exact read-only grants and no write grants', async () => {
@@ -2160,6 +2185,41 @@ test('pr-creation-agent has exact PR creation grant and delegates reads', async 
     // Content checks for github-context-agent delegation and post-create verification
     assert.match(agent, /github-context-agent/i, 'mentions github-context-agent for read delegation');
     assert.match(agent, /post-create verification|verification after creation/i, 'mentions post-create verification');
+    assert.match(agent, /`Remote-visible head branch` evidence/);
+    assert.match(agent, /remote\/git readiness must come from orchestrator handoff distilled from github-context-agent and\/or approved local inspection/);
+    assert.match(agent, /Local `read` may only inspect explicitly named PR title, body, or template artifacts from the handoff/);
+    assert.match(agent, /Do not perform local git mutations \(branch, commit, push, amend, rebase\)/);
+    assert.doesNotMatch(agent, /tag, notes/);
+    assert.doesNotMatch(agent, /orchestrator handoff or read results/);
+});
+
+test('workflow-safety-gates defines Remote-visible head branch distinct from Pushed-visible', async () => {
+    const workflowSafety = await read(workflowSafetyGatesPath);
+    const orchestrator = await read(orchestratorPath);
+    const glossary = sliceBetween(workflowSafety, '## Glossary', '## Untrusted External Content', 'workflow-safety-gates Glossary section');
+
+    assert.match(glossary, /\*\*Remote-visible head branch\*\*: The head branch exists in the intended remote owner\/repo with the referenced commits reachable/);
+    assert.match(glossary, /Evidence provenance names github-context-agent handoff and\/or approved local git inspection/);
+    assert.match(glossary, /Required before PR creation when no PR exists/);
+    assert.match(glossary, /distinct from \*\*Pushed-visible\*\*, which requires PR-diff reflection after a PR exists/);
+
+    const readinessGate = sliceBetween(workflowSafety, '## PR Readiness Evidence Gate', '### Broad Safe Validation Gate', 'workflow-safety-gates PR Readiness Evidence Gate section');
+    assert.match(readinessGate, /Remote-visible head branch evidence present before PR creation/);
+    assert.match(readinessGate, /intended remote owner\/repo, head branch, referenced commit\(s\), and provenance from github-context-agent handoff and\/or approved local git inspection/);
+
+    const localGitContract = sliceBetween(workflowSafety, '## Local Git Mutation Delegation Contract', '## Shell-Safe Local Execution', 'workflow-safety-gates Local Git Mutation Delegation Contract section');
+    assert.match(localGitContract, /Allowed command class \(branch creation, branch switch\/reuse, scoped staging, commit\/amend, rebase\/squash\/reset, push\/force-push, or metadata cleanup\/exact local branch deletion\)/);
+    assert.match(localGitContract, /Verbatim user-approval text when action requires explicit approval \(force-push, history rewrite, broad staging, default-branch ops, branch deletion\)/);
+    assert.match(localGitContract, /Metadata cleanup\/exact local branch deletion inherits destructive cleanup exclusions from `git-operator-agent`/);
+    assert.match(localGitContract, /does not authorize `git clean`, working-tree deletion, tag deletion, generic ref deletion, or broad pruning/);
+
+    const mutationAllowlistsRow = orchestrator
+        .split('\n')
+        .find((line) => line.startsWith('| GitHub and Linear mutation allowlists |')) ?? '';
+    assert.doesNotMatch(mutationAllowlistsRow, /Orchestrator only; specialists receive distilled context/);
+    assert.match(mutationAllowlistsRow, /PR creation delegates to `pr-creation-agent`/);
+    assert.match(mutationAllowlistsRow, /PR review writes delegate to `pr-review-agent`/);
+    assert.match(mutationAllowlistsRow, /Linear mutations remain orchestrator-owned/);
 });
 
 test('pr-review-agent has exact write grants and no read grants', async () => {
@@ -2220,7 +2280,7 @@ test('PR review-write contract narrows resolve-only and prefers VS Code extensio
 
     // pr-creation-agent: handoff-sourced state, no self-inspection of remote/git
     assert.match(prCreationAgent, /This agent has no GitHub read or `execute` grants, so remote and git state are taken from the handoff rather than self-inspected\./);
-    assert.match(prCreationAgent, /Confirm pushed-visible status from the orchestrator handoff \(distilled from github-context-agent reads\)/);
+    assert.match(prCreationAgent, /Confirm `Remote-visible head branch` status from the orchestrator handoff \(distilled from github-context-agent and\/or approved local inspection\)/);
     assert.doesNotMatch(prCreationAgent, /conflicts with current repository state/i);
     assert.doesNotMatch(prCreationAgent, /conflicts with current read-only repository state/i);
 
@@ -2326,17 +2386,17 @@ test('workflow-safety-gates discloses github/pull_request_review_write tool-leve
     );
 });
 
-test('pr-creation-agent forbids mutating-probe pushed-visible discovery', async () => {
+test('pr-creation-agent forbids mutating-probe remote-visible discovery', async () => {
     const content = await read(prCreationAgentPath);
     const approachSection = sliceBetween(content, '## Approach', '## Hard Gates', 'pr-creation-agent Approach section');
     assert.match(
         approachSection,
-        /treat the sub-action as blocked and report `commits not pushed-visible; PR creation blocked`/,
-        'pr-creation-agent step 2 must block rather than probe when pushed-visible evidence is missing',
+        /`Remote-visible head branch` evidence is missing.*treat the sub-action as blocked and report `commits not remote-visible; PR creation blocked`/,
+        'pr-creation-agent step 2 must block rather than probe when remote-visible head branch evidence is missing',
     );
     assert.match(
         approachSection,
-        /Do not call `mcp_github_create_pull_request` to discover pushed-visible status from its error response/,
+        /Do not call `mcp_github_create_pull_request` to discover remote-visible status from its error response/,
         'pr-creation-agent step 2 must explicitly forbid the mutating-probe reading',
     );
     assert.match(
