@@ -1,13 +1,13 @@
 ---
 name: linear-issue-workflow
-description: "Use when: fetching Linear issues via Linear MCP, triaging issue validity, creating issue branches, fixing valid issues, reviewing changes, creating GitHub pull requests, and preparing Linear update guidance."
+description: "Use when: fetching Linear issues via Linear MCP, triaging issue validity, creating issue branches, fixing valid issues, reviewing changes, delegating GitHub pull request creation, and preparing Linear update guidance."
 argument-hint: "Linear issue ID or URL, plus optional repository, base branch, and scope constraints."
 user-invocable: true
 ---
 
 # Linear Issue Workflow
 
-Fetch Linear issue via Linear MCP, triage validity/scope, fix valid issues via orchestrated delegation, create GitHub PR when verified.
+Fetch Linear issue via Linear MCP, triage validity/scope, fix valid issues via orchestrated delegation, and delegate GitHub PR creation when verified.
 
 ## When to Use
 
@@ -15,7 +15,7 @@ Fetch Linear issue via Linear MCP, triage validity/scope, fix valid issues via o
 - Determine actionability within repo scope.
 - Create feature branch from issue.
 - Fix/verify implementation.
-- Create GitHub PR.
+- Delegate GitHub PR creation.
 - Determine invalidity; propose Linear update.
 
 ## MCP Access
@@ -28,7 +28,7 @@ Obsidian vault context delegated only to `vault-context-agent` per `workflow-saf
 
 Apply `workflow-safety-gates` before Linear updates, GitHub PR creation, review/status mutations, branch ops, or state-changing remote actions. Use GitHub/Linear Remote Mutation Allowlists and Local Git Mutation Delegation Contract. Direct-entry hard stop: never use placeholder/guessed/fabricated/dummy/inferred/stale/example values; no mutating probes. Missing value → read-only fetch first or report blocked.
 
-PR creation requires: owner/repo, base/head, title/body, template status, PR Body Audit Gate pass/repaired, mandatory step completion evidence, exact PR tool selection. `Verdict: BLOCK` blocks. Linear updates approval-gated. Exact PR tool unavailable/blocked/ambiguous → stop with PR-ready summary.
+PR creation delegation requires: owner/repo, base/head, title/body, template status, PR Body Audit Gate pass/repaired, mandatory step completion evidence, and remote-visible head branch evidence/provenance. `Verdict: BLOCK` blocks. Linear updates approval-gated. Exact PR tool unavailable/blocked/ambiguous from `pr-creation-agent` → stop with PR-ready summary.
 
 ### Linear MCP
 
@@ -46,8 +46,9 @@ Orchestrator-owned reads:
 Delegated to `pr-creation-agent` after verification:
 - Call after implementation/tests/review.
 - Delegate with exact params: owner, repo, base, head, title, body, draft, readiness evidence.
+- `pr-creation-agent` selects and uses the exact PR creation tool.
 - Before creation, check repo for PR template; compose body from selected template or fallback.
-- Before creation/publication, apply `workflow-safety-gates` PR Body Audit Gate; block on failed/blocked/ambiguous.
+- Before delegating PR creation to `pr-creation-agent` or publishing any PR-ready body, apply `workflow-safety-gates` PR Body Audit Gate; block on failed/blocked/ambiguous.
 - GitHub repository file mutation tools denied pack-wide: no `mcp_github_create_or_update_file`, `mcp_github_push_files`, `mcp_github_delete_file`.
 - No substitute tools, delegation commands, or `mcp_github_create_pull_request_with_copilot`.
 - Tool unavailable/fails → stop with PR-ready summary.
@@ -59,17 +60,17 @@ Delegated to `pr-creation-agent` after verification:
 
 ## PR Creation Preflight
 
-Before calling `mcp_github_create_pull_request` (step 10), verify:
+Before delegating PR creation to `pr-creation-agent` (step 10), verify:
 
 - Implementation evidence present or explicitly not applicable.
 - Verification evidence present or explicitly not applicable.
 - Review/arbitration evidence present or explicitly not applicable.
-- Branch pushed and tracking.
+- Remote-visible head branch evidence/provenance: intended owner/repo, head branch, referenced commits reachable, and evidence source.
 - Commit hygiene done.
 - Conventional subject readiness done when commits are present.
 - Structured body readiness done when commits are present.
 - Working tree expected.
-- Exact PR tool selected (`mcp_github_create_pull_request`).
+- `pr-creation-agent` will select/use exact PR tool (`mcp_github_create_pull_request`).
 - GitHub Remote Mutation Allowlist checked.
 - No accidental files in branch.
 
@@ -81,7 +82,7 @@ Before calling `mcp_github_create_pull_request` (step 10), verify:
 
 3. **Invalid triage gate (blocking).** If invalid, stop. Explain invalidity (out of scope, duplicate, blocked, missing AC), propose Linear update (comment, status, label, assignee), ask approval, no Linear update without approval. Comment follows "Linear Comment Audience and Content": invalidity reason for issue audience, not workflow steps.
 
-4. **If valid, validate/create/switch branch.** Validate Linear branch name via Branch Rules; use if passes. No safe Linear name → derive from issue key/title. Report name. Branch ops are workflow-specialist responsibility, not Environment Inspector. No destructive force-push without approval.
+4. **If valid, validate/create/switch branch.** Validate Linear branch name via Branch Rules; use if passes. No safe Linear name → derive from issue key/title. Report name. Branch ops are `git-operator-agent` responsibility, not Environment Inspector. No destructive force-push without approval.
 
 5. **Fix via orchestrator delegation.** Before handoff: log `Handoff: <skill|agent> <name> - <purpose>; expected output: <...>; out of scope: <...>`. Actually invoke; wait for output/blocked; report before proceeding. Mandatory unavailable/fails → stop blocked. Delegate: Spec (AC/scenarios), Architect (approach), Builder (prod), Test (tests/verification), Reviewer (security/quality/failure). Larger/riskier: contextual + independent review before commit hygiene/PR. High-risk pack changes (orchestrator/tool grants/security boundaries/security-tester/multi-agent): contextual + independent or skip rationale/deference before commit hygiene. Before first push/PR: apply `workflow-safety-gates` first-round non-trivial pre-push adversarial-review rule (mandatory when non-trivial, trivial skip needs rationale, mandatory unavailable/fails blocks).
 
@@ -89,11 +90,11 @@ Before calling `mcp_github_create_pull_request` (step 10), verify:
 
 7. **Clean history with commit hygiene.** After implementation/tests/reviews/arbitration, invoke `commit-hygiene`. Before delegated git mutation, record Local Git Mutation Delegation Contract. Then: inspect/remove accidental/no-op/debug commits; ensure atomic/meaningful; invoke `conventional-commits` (subjects) and `commit-body-guidelines` (bodies); verify tests pass; require approval for pushed history rewrite. Required skill unavailable/blocked/fails → stop with local-status/PR-ready summary.
 
-8. **Push via delegated local git.** Apply Local Git Mutation Delegation Contract: record specialist, action (push), repo, branch, target, approval. Builder/Test executes. Protected branch → verify via read-only GitHub read first. Confirm push completed; commits visible before gatekeeper/PR. Before push/no-PR path, require operator-facing `Pre-push adversarial review status` (shared package, separate `Execution status` and `Verdict` fields). Proceed only with: completed + non-blocking verdict, skipped + valid trivial rationale, or not applicable + true evidence. `Verdict: BLOCK` blocks. Include all canonical fields; trivial skip no PR-body adversarial telemetry.
+8. **Push via delegated local git.** Apply Local Git Mutation Delegation Contract: record specialist, action (push), repo, branch, target, approval. `git-operator-agent` performs local commit/push mechanics and reports local push/ref evidence. Protected branch → verify via read-only GitHub read first. Confirm push completed from local/remote refs; final PR visibility/pushed-visible confirmation requires GitHub read evidence, not git-operator output alone. Before push/no-PR path, require operator-facing `Pre-push adversarial review status` (shared package, separate `Execution status` and `Verdict` fields). Proceed only with: completed + non-blocking verdict, skipped + valid trivial rationale, or not applicable + true evidence. `Verdict: BLOCK` blocks. Include all canonical fields; trivial skip no PR-body adversarial telemetry.
 
-9. **Run review closure gatekeeper.** After all steps complete, invoke `review-cycle-gatekeeper` with findings, fix evidence, pushed-visible, unresolved/reopened threads. Emits `pass | fail | BLOCK`. Do not proceed to PR on `fail`/`BLOCK`. Skip only when: (a) no reviewers ran, or (b) reviewers ran but no actionable findings; note "no fix cycle, gatekeeper skipped". PR exists → re-fetch threads; stale invalid. No PR → pass `thread state: not applicable - no PR exists yet`. Without orchestrator + no `github/*` grant → treat threads unknown, let gatekeeper emit `BLOCK`.
+9. **Run review closure gatekeeper.** After all steps complete, invoke `review-cycle-gatekeeper` with findings, fix evidence, pushed-visible status from GitHub read evidence when a PR exists, unresolved/reopened threads. Emits `pass | fail | BLOCK`. Do not proceed to PR on `fail`/`BLOCK`. Skip only when: (a) no reviewers ran, or (b) reviewers ran but no actionable findings; note "no fix cycle, gatekeeper skipped". PR exists → re-fetch threads; stale invalid. No PR → pass `thread state: not applicable - no PR exists yet`. Without orchestrator + no `github/*` grant → treat threads unknown, let gatekeeper emit `BLOCK`.
 
-10. **Create GitHub PR after verification/history/push/gatekeeper.** After all satisfactory, use `mcp_github_create_pull_request`. Preflight: implementation/verification/review/arbitration evidence or not applicable; branch pushed/tracking; commit hygiene done; conventional subject readiness done when commits present; structured body readiness done when commits present; working tree expected; exact PR tool selected; GitHub Remote Mutation Allowlist checked; no accidental files. Explicitly select/name `mcp_github_create_pull_request`. No substitute tools, file mutation tools, delegation commands, or `mcp_github_create_pull_request_with_copilot`. Apply PR Template Gate; apply PR Body Audience sub-rule; apply PR Body Audit Gate (workflow/template leakage, hard-wrap, synthesis line legality, validation honesty, `## Verified non-changes` citation, reviewer-body vs operator-notes separation). Conventional title; Linear key/link in body. Summarize changes, tests, review notes. Tool unavailable/fails → stop with PR-ready summary. Accidental pushed mutation → clean only with approval and `--force-with-lease`, then stop/re-verify.
+10. **Delegate GitHub PR creation after verification/history/push/gatekeeper.** After all satisfactory, delegate to `pr-creation-agent`. Preflight: implementation/verification/review/arbitration evidence or not applicable; remote-visible head branch evidence/provenance; commit hygiene done; conventional subject readiness done when commits present; structured body readiness done when commits present; working tree expected; GitHub Remote Mutation Allowlist checked; no accidental files. `pr-creation-agent` selects/names `mcp_github_create_pull_request`; no substitute tools, file mutation tools, delegation commands, or `mcp_github_create_pull_request_with_copilot`. Apply PR Template Gate; apply PR Body Audience sub-rule; apply PR Body Audit Gate (workflow/template leakage, hard-wrap, synthesis line legality, validation honesty, `## Verified non-changes` citation, reviewer-body vs operator-notes separation). Conventional title; Linear key/link in body. Summarize changes, tests, review notes. Tool unavailable/fails from `pr-creation-agent` → stop with PR-ready summary. Accidental pushed mutation → clean only with approval and `--force-with-lease`, then stop/re-verify.
 
 11. **Report outcome and Linear update guidance.** Summarize: issue context, triage, branch, files, review arbitration, commit history/readiness, tests, PR link, Linear update guidance. "Linear update guidance" in report is operator-facing (may name workflow steps). Actual Linear comment text (if any) is audience-facing per Externally-Posted Content Gate (workflow trace stripped) and "Linear Comment Audience and Content".
 
@@ -133,11 +134,11 @@ Valid/actionable if:
 
 ## PR Rules
 
-- Create PR only after verification and history cleanup.
+- Delegate PR creation only after verification and history cleanup.
 - PR readiness preflight: implementation/verification/review-arbitration/commit-readiness/mandatory pre-push adversarial review evidence present (non-blocking) or not applicable. Handoff log without returned status not evidence; `Verdict: BLOCK` blocking.
-- PR tool selection preflight: branch pushed/tracking, commit hygiene done, conventional subject readiness done when commits present, structured body readiness done when commits present, working tree expected, exact PR tool selected, no accidental files.
+- PR creation delegation preflight: remote-visible head branch evidence/provenance, commit hygiene done, conventional subject readiness done when commits present, structured body readiness done when commits present, working tree expected, no accidental files.
 - Remote mutation allowlist: apply GitHub/Linear allowlists before PR/Linear updates; stop if exact tool, real IDs, or approval missing.
-- Use exact tool: `mcp_github_create_pull_request` only.
+- Delegate to `pr-creation-agent`; that agent uses exact tool: `mcp_github_create_pull_request` only.
 - Honor PR template explicitly via `workflow-safety-gates` PR Template Gate (including PR Body Audience sub-rule). Compose using selected/fallback; ask on multiple ambiguous; block on `blocked-on-template-choice`/`selected-template-unreadable-choice-required`; keep template status in operator output, not PR body.
 - Audit PR body before creation via `workflow-safety-gates` PR Body Audit Gate. Block on failed/blocked/ambiguous until repaired.
 - No GitHub file mutations: `mcp_github_create_or_update_file`, `mcp_github_push_files`, `mcp_github_delete_file` denied pack-wide.

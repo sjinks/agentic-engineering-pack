@@ -1,6 +1,6 @@
 ---
 name: pr-review-fix-cycle
-description: "Internal use when: running the PR review fix cycle through Builder/Test, targeted verification, broad safe validation, commit hygiene, push, and pushed-visible confirmation."
+description: "Internal use when: running the PR review fix cycle through Builder/Test, targeted verification, broad safe validation, commit hygiene, push, local push/ref evidence, and pushed-visible confirmation."
 argument-hint: "Validated comments, fix scope, allowed commands/mutations, branch context, and verification expectations."
 user-invocable: false
 ---
@@ -90,7 +90,7 @@ Operator-facing evidence must include:
 ## Commit and Push Contract
 
 - Confirm current branch is PR head branch; do not push to default/base branch; do not force push or rewrite pushed/shared history without explicit user approval.
-- Delegate commit and push mechanics only to appropriate edit/execute-capable workflow specialist after branch/upstream checks and explicit workflow or user authorization.
+- Delegate local branch, staging, commit, amend, cleanup, push, and local push/ref evidence for downstream pushed-visible confirmation to `git-operator-agent` after branch/upstream checks and explicit workflow or user authorization.
 - Before delegating commit or push, record Local Git Mutation Delegation Contract with exact repo, branch/ref, staging scope, command class, push target, approval status.
 - Do not create remote GitHub branches or mutate repository files through GitHub as fallback for local git workflow, builder/test delegation, commit hygiene, push mechanics, or failed/unavailable tooling.
 - Do not use `git add .` or broad staging unless explicitly scoped, inspected, approved.
@@ -98,7 +98,7 @@ Operator-facing evidence must include:
 - Use atomic meaningful commits with conventional subjects and structured bodies.
 - Invoke and apply `commit-hygiene`, `conventional-commits`, `commit-body-guidelines` before push. If any required commit skill unavailable, blocked, or fails, stop with local-only status.
 - Push only after targeted verification and Broad Safe Validation Gate evidence are non-blocking and fresh, commit readiness passed, and any mandatory pre-push adversarial review completed with non-blocking verdict, valid trivial skip, or true not-applicable evidence. `Verdict: BLOCK` blocks push readiness.
-- Confirm pushed-visible state: fix commit is committed locally, pushed to PR branch, reflected in GitHub PR diff.
+- Confirm pushed-visible state with separate evidence: `git-operator-agent` reports local commit/push/ref evidence, then GitHub PR-diff visibility confirms the fix commit is reflected in the PR diff.
 
 ## Output Contract
 
@@ -111,5 +111,5 @@ Return:
 - Equivalence-class audit report when applicable.
 - Commit readiness: commit-hygiene, Conventional Commit subject, and commit body status.
 - Pre-push adversarial review status received from the orchestrator: use the shared Pre-push Adversarial Review Status package from `agentic-engineering/shared/output-format-contract.md`.
-- Commit/push status and pushed-visible confirmation.
+- `git-operator-agent` commit/push status and local push/ref evidence; separate GitHub PR-diff visibility status for pushed-visible confirmation.
 - Blockers and local-only status when push/readiness cannot proceed.
