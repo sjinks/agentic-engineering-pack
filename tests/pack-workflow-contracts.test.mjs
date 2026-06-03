@@ -531,6 +531,7 @@ test('shared output format contract exists with reusable core fields', async () 
     assert.match(text, /Residual risks/);
     assert.match(text, /Follow-up/);
     assert.match(text, /Remote-visible head branch status\/provenance/);
+    assert.match(text, /Local push\/ref evidence status\/provenance/);
     assert.match(text, /Report separately from commit\/push status and pushed-visible PR-diff visibility/);
     assert.match(text, /Pushed-visible PR-diff visibility status\/provenance/);
     assert.match(text, /Requires PR head SHA\/commit reachability and GitHub PR-diff evidence that the relevant commits are reflected in the PR/);
