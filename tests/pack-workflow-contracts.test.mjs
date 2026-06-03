@@ -373,6 +373,18 @@ function linkPathWithoutFragment(target) {
     return target.split('#')[0];
 }
 
+function isWindowsDriveAbsolutePath(targetPath) {
+    return /^[a-z]:[\\/]/i.test(targetPath);
+}
+
+function isExternalUrlTarget(targetPath) {
+    return targetPath.startsWith('//') || (/^[a-z][a-z0-9+.-]*:/i.test(targetPath) && !isWindowsDriveAbsolutePath(targetPath));
+}
+
+function isLocalAbsolutePath(targetPath) {
+    return isAbsolute(targetPath) || isWindowsDriveAbsolutePath(targetPath);
+}
+
 function sliceBetween(text, startBoundary, endBoundary, label = `${startBoundary} to ${endBoundary}`) {
     const start = text.indexOf(startBoundary);
     const endSearchStart = start >= 0 ? start + startBoundary.length : 0;
@@ -420,7 +432,6 @@ async function assertGeneratedMarkdownLinksResolve(outputRoot, relativePath) {
     const markdown = await read(pathWithin(outputRoot, relativePath));
     const outputRootPath = resolve(outputRoot);
     const markdownDirectory = resolve(pathWithin(outputRootPath, dirname(relativePath)));
-    const isExternalUrlTarget = (targetPath) => targetPath.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(targetPath);
     const sourceLayoutTargets = markdownLinkTargets(markdown)
         .filter((target) => /(?:^|\/)\.github\/(?:agents|skills|prompts)\//.test(linkPathWithoutFragment(target)));
     assert.deepEqual(sourceLayoutTargets, [], `${relativePath} has no generated links to source .github customization paths`);
@@ -428,14 +439,14 @@ async function assertGeneratedMarkdownLinksResolve(outputRoot, relativePath) {
     const absoluteMarkdownTargets = markdownLinkTargets(markdown)
         .filter((target) => {
             const targetPath = linkPathWithoutFragment(target);
-            return targetPath.endsWith('.md') && !isExternalUrlTarget(targetPath) && isAbsolute(targetPath);
+            return targetPath.endsWith('.md') && !isExternalUrlTarget(targetPath) && isLocalAbsolutePath(targetPath);
         });
     assert.deepEqual(absoluteMarkdownTargets, [], `${relativePath} has no absolute generated markdown links`);
 
     const localMarkdownTargets = markdownLinkTargets(markdown)
         .filter((target) => {
             const targetPath = linkPathWithoutFragment(target);
-            return targetPath.endsWith('.md') && !targetPath.startsWith('#') && !isExternalUrlTarget(targetPath) && !isAbsolute(targetPath);
+            return targetPath.endsWith('.md') && !targetPath.startsWith('#') && !isExternalUrlTarget(targetPath) && !isLocalAbsolutePath(targetPath);
         });
 
     assert.ok(localMarkdownTargets.length > 0, `${relativePath} includes package-local markdown links`);
@@ -450,6 +461,25 @@ async function assertGeneratedMarkdownLinksResolve(outputRoot, relativePath) {
         assert.equal(await exists(linkedPath), true, `${relativePath} package-local markdown link resolves: ${target}`);
     }
 }
+
+test('generated markdown link target classifiers distinguish URLs from local paths', () => {
+    assert.equal(isExternalUrlTarget('https://example.com/docs/file.md'), true, 'URL scheme is external');
+    assert.equal(isExternalUrlTarget('mailto:docs@example.com'), true, 'non-hierarchical URL scheme is external');
+    assert.equal(isExternalUrlTarget('//example.com/docs/file.md'), true, 'protocol-relative URL is external');
+    assert.equal(isExternalUrlTarget('/docs/file.md'), false, 'POSIX absolute path is not external');
+    assert.equal(isExternalUrlTarget('C:/docs/file.md'), false, 'Windows slash drive path is not external');
+    assert.equal(isExternalUrlTarget('C:\\docs\\file.md'), false, 'Windows backslash drive path is not external');
+    assert.equal(isExternalUrlTarget('docs/file.md'), false, 'relative markdown path is not external');
+    assert.equal(isExternalUrlTarget('#section'), false, 'fragment-only target is not external');
+    assert.equal(isExternalUrlTarget('../escaped.md'), false, 'escaping relative path is not external');
+
+    assert.equal(isLocalAbsolutePath('/docs/file.md'), true, 'POSIX absolute path is local absolute');
+    assert.equal(isLocalAbsolutePath('C:/docs/file.md'), true, 'Windows slash drive path is local absolute');
+    assert.equal(isLocalAbsolutePath('C:\\docs\\file.md'), true, 'Windows backslash drive path is local absolute');
+    assert.equal(isLocalAbsolutePath('docs/file.md'), false, 'relative markdown path is not absolute');
+    assert.equal(isLocalAbsolutePath('#section'), false, 'fragment-only target is not absolute');
+    assert.equal(isLocalAbsolutePath('../escaped.md'), false, 'escaping relative path is checked by containment after resolution');
+});
 
 test('generated markdown link resolver rejects absolute and escaping local markdown targets', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'agentic-engineering-link-resolve-'));
@@ -1134,9 +1164,9 @@ test('generated plugin includes real guide docs at the README guide link target'
             read(pathWithin(outputRoot, 'agentic-engineering/plugin.json')),
         ]);
 
-        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\agentic-engineering\/agents\//, 'source guide keeps repository-relative agent links');
-        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/\agentic-engineering\/skills\//, 'source guide keeps repository-relative skill links');
-        assert.doesNotMatch(generatedGuide, /\]\(\.\.\/\.\.\/\agentic-engineering\/(agents|skills|prompts)\//, 'generated guide does not link to repository agentic-engineering surfaces');
+        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/agentic-engineering\/agents\//, 'source guide keeps repository-relative agent links');
+        assert.match(sourceGuide, /\]\(\.\.\/\.\.\/agentic-engineering\/skills\//, 'source guide keeps repository-relative skill links');
+        assert.doesNotMatch(generatedGuide, /\]\(\.\.\/\.\.\/agentic-engineering\/(agents|skills|prompts)\//, 'generated guide does not link to repository agentic-engineering surfaces');
         assert.doesNotMatch(generatedGuide, /\]\(\.\.\/\.\.\/\.github\/(agents|skills)\//, 'generated guide does not link to source .github agent or skill paths');
         assert.ok(generatedAgentLinks.length > 0, 'generated guide has package-local agent links');
         assert.ok(generatedSkillLinks.length > 0, 'generated guide has package-local skill links');
@@ -2688,8 +2718,8 @@ test('PR description template policy owns template discovery and operator-facing
     const text = await read(prDescriptionTemplatePolicyPath);
 
     assert.match(text, /aligns with the `workflow-safety-gates` PR Template Gate/);
-    assert.match(text, /\agentic-engineering\/pull_request_template\.md/);
-    assert.match(text, /\agentic-engineering\/PULL_REQUEST_TEMPLATE\/\*\.md/);
+    assert.match(text, /agentic-engineering\/pull_request_template\.md/);
+    assert.match(text, /agentic-engineering\/PULL_REQUEST_TEMPLATE\/\*\.md/);
     assert.match(text, /If exactly one readable template is found/);
     assert.match(text, /Ambiguity is based on readable templates, not total candidate count/);
     assert.match(text, /If exactly one readable template is found[\s\S]+even if other discovered candidates are unreadable/);

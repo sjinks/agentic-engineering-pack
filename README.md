@@ -98,6 +98,7 @@ The pack uses minimal permissions per role.
 | Vault Context | exact `obsidian/...` read-only grants: `obsidian/search_vault`, `obsidian/search_vault_simple`, `obsidian/search_vault_smart`, `obsidian/get_vault_file`, `obsidian/get_vault_file_partial`, `obsidian/get_files_by_tag`, `obsidian/get_backlinks`, `obsidian/get_outgoing_links`, `obsidian/list_vault_files`, `obsidian/get_server_info` |
 | Research | `web` |
 | Environment Inspector | `read`, `search`, `execute` |
+| Git Operator | `read`, `search`, `edit`, `execute` |
 | Spec | `read`, `search`, `vscode/askQuestions` |
 | Architect | `read`, `search`, `web` |
 | Builder | `read`, `search`, `edit`, `execute` |
@@ -108,7 +109,7 @@ The pack uses minimal permissions per role.
 | Independent Code Reviewer | `read`, `search` |
 | Integrator | `read`, `search`, `todo` |
 
-Builder and Test are the only agents with `edit` access. They may use execute for scoped local verification. Environment Inspector owns command-backed read-only local analysis for reviewers and Integrator; reviewer agents and Integrator request or consume environment-inspector evidence rather than holding direct `execute`. They must not write files, modify git state, install packages, start services, or contact external systems.
+Builder, Test, and Git Operator are the agents with `edit` access. Builder and Test use edit access for implementation and verification work; Git Operator uses edit access only for approved local git mechanics such as git message or metadata files. Builder and Test may use execute for scoped local verification. Environment Inspector owns command-backed read-only local analysis for reviewers and Integrator; reviewer agents and Integrator request or consume environment-inspector evidence rather than holding direct `execute`. They must not write files, modify git state, install packages, start services, or contact external systems.
 
 Shared safety gates are centralized in `.github/skills/workflow-safety-gates/SKILL.md`; Linear-only safety rules live in `.github/skills/linear-safety-gates/SKILL.md`. `git-operator-agent` owns local branch, staging, commit, cleanup, push, and local push/ref evidence mechanics after the shared git preflight and Local Git Mutation Delegation Contract pass; GitHub branch and PR-diff visibility evidence comes from `github-context-agent` reads. Builder/Test implement and verify but do not perform local git mutations. PR creation is delegated to `pr-creation-agent` via orchestrator coordination after readiness evidence is present. Direct-entry agents, skills, and prompts still include local hard-stop rules for missing critical parameters, unsafe git targets, broad staging, default/base pushes, pushed/shared history rewrites without approval, mutating probes, and unavailable approvals.
 Linear reads are centralized in `linear-context-agent`; approved Linear updates are centralized in `linear-update-agent`. The orchestrator and non-Linear specialists receive distilled Linear context and do not self-service Linear reads or mutations.
