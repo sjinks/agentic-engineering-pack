@@ -32,7 +32,7 @@ Verdict composition:
 - `PLAN-PARTIAL` (missing `Owner`) blocks merge.
 - `BLOCK` (missing input/unwaived blocking finding) → gatekeeper emits `BLOCK`.
 
-Skip when: documentation/formatting-only, triage-only, no severity findings. When skipping, output `Test-gap plan status: skipped (reason: <one-line rationale>)`. This is distinct from the `no fix cycle, gatekeeper skipped` sentinel used in gatekeeper workflows when the entire fix/review cycle is bypassed. Orchestrator reports skip reason and status.
+Skip when: documentation/formatting-only, triage-only, no severity findings. When skipping, output `Test-gap plan status: skipped (reason: <one-line rationale>)`. This is distinct from the gatekeeper skip sentinel `no fix cycle, gatekeeper skipped`, which is used only when the entire fix/review cycle is bypassed. Orchestrator reports skip reason and status.
 
 ## Boundaries
 
