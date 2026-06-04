@@ -27,7 +27,7 @@ The lightweight panel below covers the most common engineering decisions. Four a
 - Code Reviewer (`code-reviewer-agent`): review correctness, maintainability, behavior, and test gaps with full implementation context.
 - Independent Code Reviewer (`independent-code-reviewer-agent`): review correctness, regressions, and test gaps with minimal implementer context.
 - Integrator (`integrator-agent`): synthesize findings and prepare final readiness notes.
-- Review Cycle Gatekeeper (`review-cycle-gatekeeper` skill): per-round closure check after at least one review-fix cycle; consumes the integrator's reconciled findings (when integrator arbitration ran) or the reviewers' findings directly, plus pushed-visible status, and produces a `pass | fail | BLOCK` gate decision under the canonical severity vocabulary.
+- Review Cycle Gatekeeper (`review-cycle-gatekeeper` skill): per-round closure check after at least one review-fix cycle; consumes the integrator's reconciled findings (when integrator arbitration ran) or the reviewers' findings directly, plus applicable visibility/thread evidence, and produces a `pass | fail | BLOCK` gate decision under the canonical severity vocabulary.
 
 ## Procedure
 
@@ -38,7 +38,7 @@ The lightweight panel below covers the most common engineering decisions. Four a
 5. Give each role narrow prompt with explicit output needs and non-goals.
 6. Compare findings for conflicts, duplicate concerns, missing coverage.
 7. Ask one targeted question only when panel cannot proceed without user input.
-8. When panel ran reviewer roles AND at least one fix cycle, invoke `review-cycle-gatekeeper` before final synthesis to consume integrator's reconciled findings (when integrator arbitration ran) or reviewers' findings directly, plus pushed-visible status; do not produce integrated answer while gatekeeper reports `fail` or `BLOCK`. Skip gatekeeper only in cases `workflow-safety-gates` Glossary "Gatekeeper-skip sentinel" enumerates — (a) no reviewer specialists ran, or (b) reviewer specialists ran but produced no actionable findings — and explicitly note canonical sentinel `no fix cycle, gatekeeper skipped` in panel output.
+8. When panel ran reviewer roles AND at least one fix cycle, invoke `review-cycle-gatekeeper` before final synthesis to consume integrator's reconciled findings (when integrator arbitration ran) or reviewers' findings directly, plus applicable visibility/thread evidence from the gatekeeper required inputs; do not produce integrated answer while gatekeeper reports `fail` or `BLOCK`. Skip gatekeeper only in cases `workflow-safety-gates` Glossary "Gatekeeper-skip sentinel" enumerates — (a) no reviewer specialists ran, or (b) reviewer specialists ran but produced no actionable findings — and explicitly note canonical sentinel `no fix cycle, gatekeeper skipped` in panel output.
 9. Produce integrated answer with decisions, validation, residual risk.
 
 ## Audience

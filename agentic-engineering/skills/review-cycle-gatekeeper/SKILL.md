@@ -27,7 +27,7 @@ Typical triggers: reviewer findings addressed in follow-up commits; unresolved/r
 - Read-only, decision-only. No file edits, commands, commits, pushes, replies, or thread resolution. Remediation via `pr-review-comments-workflow` and builder/test specialists.
 - Test-evidence source: `test-gap-to-test-plan`. `PLAN-READY` with all `must-have` cases `Status: landed` satisfies test-evidence rule; `BLOCK`, `PLAN-PARTIAL`, or unlanded `must-have` fails it. Functional fixes require test evidence or explicit no-test rationale.
 - GitHub context from `github-context-agent` via orchestrator per `workflow-safety-gates`. Consumes distilled findings, fix evidence, visibility status.
-- Anchors to `workflow-safety-gates`: "Pushed-visible" per Glossary; PR Review Visibility and Thread Gate; PR Readiness Evidence Gate.
+- Anchors to `workflow-safety-gates`: "Pushed-visible" and "Remote-visible head branch" per Glossary; PR review visibility/thread rules; PR Readiness Evidence Gate.
 - Severity vocabulary: title-case `Critical`/`High`/`Medium`/`Low` maps to canonical `CRITICAL`/`HIGH`/`MEDIUM`/`LOW`. Finding states: `fixed`/`owned-with-remediation-plan`/`waived-with-rationale`/`open`.
 - Conflicts with `pr-review-comments-workflow`: choose conservative path. Gate outputs operator-facing; not reviewer-facing.
 
@@ -35,9 +35,11 @@ Typical triggers: reviewer findings addressed in follow-up commits; unresolved/r
 
 - Findings list with severity and current status.
 - Fix summary or commit list tied to findings.
-- Verification evidence: targeted verification and Broad Safe Validation Gate evidence when PR-review fixes in scope. Broad evidence: status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`), repository discovery, candidate commands, selection conclusion, classification, dirty-state boundary, freshness for final worktree/fix batch, proceed/block effect, residual risk, next action. Stale/unknown freshness → `BLOCK`.
-- Unresolved/reopened thread list (empty valid, unknown not). Must be read after the PR head SHA reaches the current value, and the PR head SHA at the time of the thread read must match the PR head SHA at the time of gatekeeper invocation. A mismatch means the snapshot is stale and input is invalid; produce `BLOCK`. Unknown thread state or stale snapshots → `BLOCK`.
-- Pushed-visible state per `workflow-safety-gates` Glossary. Each `fixed` finding's fix commit MUST be reachable from PR head SHA. Unknown → `BLOCK`.
+- Verification evidence after fixes, separated into targeted verification and Broad Safe Validation Gate evidence when PR-review fixes are in scope. broad evidence must include broad safe validation status (`passed`/`failed`/`blocked`/`skipped`/`not applicable`/`mutating-only`), repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, dirty-state boundary result when executed, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. If contextual/independent review, builder/test follow-up, formatting, generated-output handling, or any other fix step changed the worktree after broad validation evidence was produced, that evidence is stale until rerun or explicitly re-established for the final changed surface. stale or unknown freshness makes the gatekeeper emit `BLOCK`.
+- Review visibility mode, exactly one of:
+  - Existing PR: `Pushed-visible` PR-diff evidence per `workflow-safety-gates` Glossary, PR head SHA, and unresolved/reopened thread list (empty valid, unknown not). Thread state must be read after the PR head SHA reaches the current value, and the PR head SHA at the time of the thread read must match the PR head SHA at gatekeeper invocation. A mismatch means the snapshot is stale and input is invalid; produce `BLOCK`. Unknown thread state or stale snapshots → `BLOCK`.
+  - Pre-PR/no PR: `Remote-visible head branch` evidence per `workflow-safety-gates` Glossary, the remote-visible head commit or explicit referenced commit set, and explicit no-PR proof with `thread state: not applicable - no PR exists yet` (for example no PR number, no linked PR, and PR creation has not yet run). Missing, stale, local-only, ambiguous, or collapsed no-PR proof → `BLOCK`.
+- Fixed-finding visibility mapping: in Existing PR mode, each `fixed` finding's fix commit MUST be reachable from the PR head SHA reflected in the PR diff. In Pre-PR/no PR mode, each `fixed` finding's fix commit MUST be reachable from the remote-visible head commit or contained in the explicit referenced commit set for the remote-visible head branch. Unknown reachability → `BLOCK`.
 
 ## Severity Vocabulary
 
@@ -75,10 +77,11 @@ Reopened `fixed` findings return to `open`. Prior verification evidence invalida
 3. Every `Medium` finding must be `fixed`, `owned-with-remediation-plan`, or `waived-with-rationale`.
 4. Every `Low` finding tracked in one of four states. Never blocks merge.
 5. Every functional fix requires test evidence or explicit no-test rationale. Functional fix: alters runtime behavior, public contract, persisted state, or security posture.
-6. PR-review fix cycles require Broad Safe Validation Gate evidence. `passed` satisfies only when fresh for final worktree/fix batch. `failed`, `blocked`, stale, unknown freshness → `BLOCK`. `skipped`/`not applicable` valid only with full evidence package. `mutating-only` requires authorized run or residual-risk rationale.
-7. Every fix batch requires full re-review of touched areas.
-8. Regressions treated as new findings in matrix, summarized in "New regressions".
-9. Gate passes when: all `Critical` findings `fixed` or fully waived; all `High` findings `fixed` or fully waived; all `Medium` findings `fixed`/owned/waived; Broad Safe Validation non-blocking and fresh.
+6. PR-review fix cycles require Broad Safe Validation Gate evidence. Targeted checks alone do not satisfy this rule when broad safe validation is available. `passed` satisfies the rule only when the evidence is fresh for the final candidate worktree/fix batch. `failed`, `blocked`, stale evidence, and unknown freshness make the gate emit `BLOCK`; missing, failed, blocked, stale, or unknown freshness broad safe validation emits `BLOCK`. a failed selected broad safe validation remains blocking until its failure is addressed, or until the workflow is re-scoped or reclassified so that command is no longer the selected broad safe validation. `skipped` and `not applicable` are valid only when the evidence includes repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action. `mutating-only` is not a pass; it requires either a separately reported authorized mutating/output-writing run with dirty-state/output boundaries, or an accepted residual-risk rationale that explicitly covers not running it. Otherwise the gate emits `BLOCK` for missing evidence.
+7. Visibility/thread evidence must match workflow context. Existing PR and PR-review reply/resolve paths require `Pushed-visible` PR-diff evidence, PR head SHA, and fresh unresolved/reopened thread state; `Remote-visible head branch` evidence is insufficient for those paths. Pre-PR Linear PR-creation readiness may use `Remote-visible head branch` evidence only with explicit no-PR proof and `thread state: not applicable - no PR exists yet`; it does not require PR head SHA or PR thread state because no PR exists yet.
+8. Every fix batch requires full re-review of touched areas.
+9. Regressions treated as new findings in matrix, summarized in "New regressions".
+10. Gate passes when: all `Critical` findings `fixed` or fully waived; all `High` findings `fixed` or fully waived; all `Medium` findings `fixed`/owned/waived; visibility/thread evidence is valid for the workflow context; Broad Safe Validation non-blocking and fresh.
 
 ## Waiver Rules
 
@@ -110,10 +113,11 @@ Invalid `Critical` waiver (missing any field) → finding remains `open`, gate f
 
 1. Map each finding to one of four states; reject other labels.
 2. Validate required artifacts per state.
-3. Verify fixes linked to findings; touched areas re-reviewed.
-4. PR-review cycles: evaluate targeted and Broad Safe Validation separately. Reject targeted-only when broad available; `BLOCK` for missing/failed/blocked/stale/unknown-freshness broad validation.
-5. Check regressions; add as findings.
-6. Apply Gate Rules; issue decision.
+3. Select exactly one visibility mode from the provided evidence. Reject missing, mixed, collapsed, stale, or workflow-incompatible visibility/thread evidence with `BLOCK`.
+4. Verify fixes linked to findings under the selected visibility mode: PR head SHA reachability for Existing PR mode, or remote-visible head commit/referenced-commit reachability for Pre-PR/no PR mode. Confirm touched areas re-reviewed.
+5. PR-review cycles: evaluate targeted and Broad Safe Validation separately. Reject targeted-only evidence when broad safe validation is available, and emit `BLOCK` for missing, failed, blocked, stale, or unknown freshness broad validation evidence.
+6. Check regressions; add as findings.
+7. Apply Gate Rules; issue decision.
 
 ### Insufficient Input
 
@@ -127,7 +131,8 @@ Include:
 - Findings matrix: `id`, `severity`, `state`, `owner`, `evidence`. Regressions as own rows.
 - New regressions summary.
 - Missing evidence.
-- Broad Safe Validation Gate evidence: targeted status; broad validation status; discovery evidence; candidate commands; selection conclusion; classification; dirty-state boundary; freshness for final worktree/fix batch; proceed/block effect; residual risk; next action; sufficiency.
+- Visibility and thread evidence: selected mode (`Existing PR` or `Pre-PR/no PR`), PR head SHA and fresh thread-state proof for Existing PR mode, or remote-visible head branch/head commit plus explicit no-PR proof and `thread state: not applicable - no PR exists yet` for Pre-PR/no PR mode; include whether each `fixed` finding maps to the selected head evidence.
+- Broad Safe Validation Gate evidence: targeted verification status; broad safe validation status; repository-local discovery evidence; candidate command(s) inspected; selected command or unavailable-command conclusion; command classification basis; dirty-state boundary result when executed; freshness evidence for the final candidate worktree/fix batch; proceed/block effect; residual risk; next operator action; and whether the evidence is sufficient for this gate.
 - Waivers and validity.
 - Gate decision: `pass`, `fail`, or `BLOCK`.
 - Exact blockers.
@@ -151,6 +156,12 @@ New regressions:
 
 Missing evidence:
 - <item or None>
+
+Visibility and thread evidence:
+- selected mode: <Existing PR|Pre-PR/no PR>
+- head evidence: <PR head SHA and pushed-visible PR diff evidence, or remote-visible head branch/head commit evidence>
+- thread state: <fresh unresolved/reopened snapshot, or thread state: not applicable - no PR exists yet with proof>
+- fixed-finding mapping: <each fixed finding reaches selected head evidence, or blocker>
 
 Broad Safe Validation Gate evidence:
 - targeted verification status: <status/evidence>

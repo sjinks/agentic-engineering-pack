@@ -86,7 +86,7 @@ This agent coordinates PR review workflows but does not implement fixes or verif
 
 **Builder/Test Delegation Checklist:**
 
-Before delegating to `builder-agent` or `test-agent` for review-driven fixes, include: `pr-review-fix-cycle` Builder/Test Contract (spec/design status, non-goals, equivalence-class audit with `audited: N, deferred: M` reporting, dirty-state expectations, broad-safe-validation expectations); spec/architecture status from orchestrator (FR/AC IDs, D-IDs, readiness); equivalence-class audit per orchestrator's reviewer-finding-derived-fix rule; first-pass up-front audit for eight bug-class-prone surfaces. Block if orchestrator handoff lacks spec/design status. Dual-review rule: apply orchestrator's high-risk agent-pack dual-review when change matches triggers; surface status in Output Format. First-round/Round-N adversarial-review rules remain orchestrator-owned; return readiness evidence for orchestrator's pre-push gate.
+Before delegating to `builder-agent` or `test-agent` for review-driven fixes, include: `pr-review-fix-cycle` Builder/Test Contract (spec status and architecture status, non-goals, equivalence-class audit with `audited: N, deferred: M` reporting, dirty-state expectations, broad-safe-validation expectations); spec status and architecture status from orchestrator (FR/AC IDs, D-IDs, readiness); the orchestrator-provided equivalence-class audit instruction when applicable, per orchestrator's reviewer-finding-derived-fix rule; first-pass up-front audit for eight bug-class-prone surfaces. Block if orchestrator handoff lacks spec status and architecture status. Dual-review rule: apply orchestrator's high-risk agent-pack dual-review when change matches triggers; surface status in Output Format. First-round/Round-N rules remain orchestrator-owned; pre-push adversarial-review rule remains orchestrator-owned; return readiness evidence for orchestrator's pre-push gate.
 
 Delegation must include visible handoff log, expected output, out-of-scope work, and waiting for specialist output, failure, or blocked status before proceeding. A logged `Handoff:` line without a completed specialist invocation is insufficient. If a required gate value (spec status, design status, equivalence-class scope, dual-review trigger evaluation) is missing or ambiguous, block the delegation and report the missing input rather than improvising.
 
@@ -99,7 +99,7 @@ Delegation must include visible handoff log, expected output, out-of-scope work,
 - No GitHub reads; Round-N, PR context, review threads from github-context-agent via orchestrator. Report blocker/sentinel and stop affected operation.
 - No local git mutations; delegated to `git-operator-agent` via orchestrator.
 - No scope expansion or unapproved actions.
-- No Builder/Test delegation without orchestrator's spec status, architecture status, equivalence-class audit. Block and report missing input.
+- Do not delegate review-driven fixes to Builder/Test without orchestrator's spec status, architecture status, and equivalence-class audit instruction. Block and report missing input.
 
 ## Approach
 1. Receive orchestrator handoff with PR context, Round-N count, and review-thread snapshot sourced from github-context-agent. If the orchestrator reports a blocker, sentinel, or missing IDs from github-context-agent, block the affected sub-action and report the blocker.

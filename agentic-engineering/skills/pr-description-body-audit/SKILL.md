@@ -11,9 +11,9 @@ Internal support skill for `pull-request-description`. Users should not choose t
 
 ## Direct Invocation Hard Stop
 
-If user/operator invokes this support skill directly, stop with `blocked-direct-invocation` before auditing. Route final copy/paste PR descriptions to `pull-request-description`; route PR creation workflows to orchestrator or `linear-issue-workflow` so full `workflow-safety-gates` PR Template Gate and PR Body Audit Gate can run.
+If user/operator invokes this support skill directly, stop with `blocked-direct-invocation` before auditing. Route final copy/paste PR descriptions to `pull-request-description`; route PR creation workflows to the orchestrator or `linear-issue-workflow` so full `workflow-safety-gates` PR Template Gate and PR Body Audit Gate can run.
 
-This hard stop does not apply when `pull-request-description`, orchestrator, or workflow skill invokes this skill internally as part of PR body composition or PR creation preflight.
+This hard stop does not apply when `pull-request-description`, the orchestrator, or a workflow skill invokes this skill internally as part of PR body composition or PR creation preflight.
 
 ## Responsibility
 
@@ -21,7 +21,7 @@ Audit the reviewer-facing PR body before it is returned in a fenced `markdown` c
 
 ## Inputs
 
-- Complete candidate reviewer-facing PR body.
+- Complete candidate PR body intended for the reviewer-facing PR description.
 - Template status and selected template source from `pr-description-template-policy`.
 - Validation/test/review evidence and omitted-validation notes.
 - Synthesis pre-push adversarial-review status, if relevant.
@@ -32,7 +32,7 @@ Audit the reviewer-facing PR body before it is returned in a fenced `markdown` c
 
 1. Inspect the full candidate body as a PR reviewer who has no knowledge of this workflow.
 2. Remove or block workflow, tool, MCP, skill, host, and template-status leakage from the body; move operator diagnostics to operator-facing notes.
-3. Check for accidental hard-wrapped paragraphs or list items; repair them before emission, or block and fail fast when the audit cannot confidently distinguish intentional Markdown structure from accidental hard wrapping.
+3. Before returning or emitting the fenced Markdown body, inspect the candidate PR body for accidental hard-wrapped paragraphs or list items. Repair hard-wrapped paragraphs or list items before emitting. When the audit cannot confidently distinguish intentional Markdown structure from accidental hard wrapping, block and fail fast.
 4. Verify validation language is honest, reviewer-facing, and free of workflow-specialist narration.
 5. Validate synthesis adversarial-review PR-body lines for legality and placement.
 6. Validate `## Verified non-changes` items, dropping invalid items with operator-facing explanation rather than shipping incomplete reviewer evidence.
@@ -48,14 +48,14 @@ Write validation in plain reviewer-facing terms. Example: "Added unit tests for 
 
 Candidate body must not name template's existence, absence, source, or fallback selection. Remove or block: `PR template status: ...`, `No pull_request_template.md exists in the repo`, `Body follows the de-facto template observed in ...`, `template observed in the existing commit-body and PR history`, `fallback template used`, `template unreadable`, `multiple templates with user selection`.
 
-Template status, validation source, omissions/warnings, update status remain in operator-facing notes outside fenced PR body. They do not appear inside copy/pasteable body, as trailing `PR template status:` line, footnote, or separator block at bottom.
+Template status, validation source, omissions/warnings, and update status remain in operator-facing notes outside the fenced PR body. They do not appear inside copy/pasteable body, as trailing `PR template status:` line, footnote, or separator block at bottom.
 
 ## Hard-Wrap Rules
 
 - Do not hard-wrap PR body paragraphs or list items; one logical paragraph is one line in Markdown source, one list item is one line.
 - Use hard line breaks only for real Markdown structure: paragraph breaks via blank lines, list items, headings, fenced code blocks, tables, intentional `<br>`.
-- ~72-character body wrap from `commit-body-guidelines` and `conventional-commits` applies to commit bodies only; do not carry their wrap width into PR body.
-- Before returning/emitting fenced Markdown body, inspect candidate for accidental hard-wrapped paragraphs/list items. Repair before emitting, or block when audit cannot confidently distinguish intentional Markdown structure from accidental hard wrapping.
+- ~72-character body wrap from `commit-body-guidelines` and `conventional-commits` applies to commit bodies only; do not carry their wrap width into the PR body.
+- Before returning/emitting fenced Markdown body, inspect candidate for accidental hard-wrapped paragraphs/list items. Repair before emitting. When audit cannot confidently distinguish intentional Markdown structure from accidental hard wrapping, block and fail fast.
 - Preserve formatting of fenced code blocks and tables verbatim.
 - GitHub renders PR body as Markdown and reflows paragraphs to container width, so unwrapped source lines render correctly across viewports.
 

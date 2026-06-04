@@ -1,6 +1,6 @@
 ---
 name: pr-review-fix-cycle
-description: "Internal use when: running the PR review fix cycle through Builder/Test, targeted verification, broad safe validation, commit hygiene, push, local push/ref evidence, and pushed-visible confirmation."
+description: "Internal use when: running the PR review fix cycle through Builder/Test, targeted verification, broad safe validation, commit hygiene, push, local push/ref evidence, and pushed-visible PR-diff confirmation."
 argument-hint: "Validated comments, fix scope, allowed commands/mutations, branch context, and verification expectations."
 user-invocable: false
 ---
@@ -8,6 +8,8 @@ user-invocable: false
 # PR Review Fix Cycle
 
 Coordinate implementation and verification for validated PR review comments. This skill owns local fix cycle contract; GitHub context acquisition handled by `github-context-agent`, GitHub mutations delegated to `pr-review-agent`.
+
+Delegate local branch, staging, commit, amend, cleanup, push mechanics, and local push/ref evidence to `git-operator-agent`. PR-diff pushed-visible confirmation requires orchestrator-sourced `github-context-agent` reads after the push.
 
 ## Builder/Test Contract
 
@@ -29,6 +31,15 @@ Broad safe validation is the broadest bounded, non-mutating, locally supported v
 **Freshness evidence:** Evidence is fresh only when produced after the final candidate worktree/fix batch, or explicitly re-established after later edits. Any later edit to relevant files — including contextual/independent review follow-up, builder/test edits, formatting, generated-output handling, or other worktree changes — makes prior broad validation evidence stale until the validation is rerun or re-established for the final changed surface.
 
 **Status distinctions:** `skipped` (available, intentionally omitted with rationale and residual-risk acceptance) is distinct from `not applicable` (no meaningful broad validation exists after repository-local inspection) and `mutating-only` (only candidates requiring approval or authorized execution exist; not a pass until mutating candidate runs or risk explicitly covers not running it). Evidence requirements and blocking behavior differ per status.
+
+Canonical status definitions:
+
+- `passed`: the selected broad safe validation completed successfully, dirty-state boundaries remained acceptable, and the evidence is fresh for the final candidate worktree/fix batch.
+- `failed`: selected broad safe validation ran and failed. This blocks push, reviewer-facing replies, and thread resolution until the selected broad safe validation failure is addressed, or until the workflow is re-scoped or reclassified so that command is no longer the selected broad safe validation. A failed selected broad safe validation cannot be waived through residual risk.
+- `blocked`: broad safe validation should run but cannot be selected or executed under current policy, tooling, dirty-state, or command-boundary constraints; this blocks push, reviewer-facing replies, and thread resolution.
+- `skipped`: broad safe validation is available but intentionally skipped only with repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action.
+- `not applicable`: no meaningful broad validation exists after repository-local inspection; proceed only with repository-local discovery evidence, candidate command(s) inspected, selected command or unavailable-command conclusion, command classification basis, freshness evidence for the final candidate worktree/fix batch, proceed/block effect, residual risk, and next operator action.
+- `mutating-only`: only mutating, network, service-starting, package-management, or output-writing candidates exist. This is not a pass. It may proceed only with freshness evidence for the final candidate worktree/fix batch and after either the authorized mutating/output-writing candidate actually ran and is reported separately with dirty-state/output boundaries, or an accepted residual-risk rationale explicitly covers not running it.
 
 **Status Decision Table (selects the status):**
 
@@ -90,7 +101,7 @@ Operator-facing evidence must include:
 ## Commit and Push Contract
 
 - Confirm current branch is PR head branch; do not push to default/base branch; do not force push or rewrite pushed/shared history without explicit user approval.
-- Delegate local branch, staging, commit, amend, cleanup, push, and local push/ref evidence for downstream pushed-visible confirmation to `git-operator-agent` after branch/upstream checks and explicit workflow or user authorization.
+- Delegate local branch, staging, commit, amend, cleanup, push mechanics, and local push/ref evidence to `git-operator-agent` after branch/upstream checks and explicit workflow or user authorization.
 - Before delegating commit or push, record Local Git Mutation Delegation Contract with exact repo, branch/ref, staging scope, command class, push target, approval status.
 - Do not create remote GitHub branches or mutate repository files through GitHub as fallback for local git workflow, builder/test delegation, commit hygiene, push mechanics, or failed/unavailable tooling.
 - Do not use `git add .` or broad staging unless explicitly scoped, inspected, approved.
@@ -98,7 +109,7 @@ Operator-facing evidence must include:
 - Use atomic meaningful commits with conventional subjects and structured bodies.
 - Invoke and apply `commit-hygiene`, `conventional-commits`, `commit-body-guidelines` before push. If any required commit skill unavailable, blocked, or fails, stop with local-only status.
 - Push only after targeted verification and Broad Safe Validation Gate evidence are non-blocking and fresh, commit readiness passed, and any mandatory pre-push adversarial review completed with non-blocking verdict, valid trivial skip, or true not-applicable evidence. `Verdict: BLOCK` blocks push readiness.
-- Confirm pushed-visible state with separate evidence: `git-operator-agent` reports local commit/push/ref evidence, then GitHub PR-diff visibility confirms the fix commit is reflected in the PR diff.
+- Collect local push/ref evidence from `git-operator-agent`, then confirm pushed-visible state through `github-context-agent` PR-diff evidence: fix commit is committed locally, pushed to PR branch, and reflected in the GitHub PR diff.
 
 ## Output Contract
 
